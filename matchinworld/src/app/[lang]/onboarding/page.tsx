@@ -137,11 +137,23 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
 
       if (tmpEmail && tmpPass) {
         await supabase.auth.signOut()
-        await supabase.auth.signInWithPassword({ email: tmpEmail, password: tmpPass })
+        const { error: signInError } = await supabase.auth.signInWithPassword({ 
+          email: tmpEmail, 
+          password: tmpPass 
+        })
         sessionStorage.removeItem('tmp_email')
         sessionStorage.removeItem('tmp_pass')
+        
+        if (signInError) {
+          setError(isAr ? 'حدث خطأ، سجل دخول يدوياً' : 'Error occurred, please login manually')
+          setLoading(false)
+          return
+        }
+        
+        // انتظر عشان الـ session تتحدث
+        await new Promise(resolve => setTimeout(resolve, 1500))
       }
-
+      
       if (role === 'client') {
         window.location.href = `/${safeLang}/dashboard`
       } else {

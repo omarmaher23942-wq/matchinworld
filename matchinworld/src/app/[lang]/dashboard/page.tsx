@@ -75,6 +75,8 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
 
   useEffect(() => {
     async function load() {
+      await supabase.auth.refreshSession()
+
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (!authUser) { window.location.href = `/${safeLang}/auth/login`; return }
 
