@@ -20,16 +20,13 @@ const fadeUp = {
 
 function BookingCard({ b, safeLang, isAr }: { b: any; safeLang: string; isAr: boolean }) {
   const { status, minutesUntil } = useSessionTimer(b.scheduled_at)
-
   return (
     <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 hover:border-blue-100 transition-all">
       <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center shrink-0">
         <IconUser size={22} className="text-blue-600" />
       </div>
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-gray-900 text-sm truncate">
-          {b.specialists?.users?.name}
-        </p>
+        <p className="font-semibold text-gray-900 text-sm truncate">{b.specialists?.users?.name}</p>
         <div className="flex items-center gap-3 mt-1">
           <span className="text-xs text-gray-500 flex items-center gap-1">
             <IconCalendar size={12} />
@@ -48,10 +45,8 @@ function BookingCard({ b, safeLang, isAr }: { b: any; safeLang: string; isAr: bo
           </span>
         )}
         {status === 'ready' && (
-          <Link
-            href={`/${safeLang}/session/${b.id}`}
-            className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all animate-pulse"
-          >
+          <Link href={`/${safeLang}/session/${b.id}`}
+            className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all animate-pulse">
             {isAr ? 'انضم الآن' : 'Join Now'}
           </Link>
         )}
@@ -89,6 +84,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
       if (!userData) { window.location.href = `/${safeLang}/onboarding`; return }
       if (userData.role === 'admin') { window.location.href = `/${safeLang}/admin`; return }
       if (userData.role === 'specialist') { window.location.href = `/${safeLang}/specialist/dashboard`; return }
+      if (userData.role !== 'client') { window.location.href = `/${safeLang}/onboarding`; return }
 
       setUser(userData)
 
@@ -114,8 +110,8 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
     window.location.href = `/${safeLang}`
   }
 
-  const upcomingBookings  = bookings.filter(b => b.status === 'confirmed')
-  const pendingBookings   = bookings.filter(b => b.status === 'pending_payment')
+  const upcomingBookings = bookings.filter(b => b.status === 'confirmed')
+  const pendingBookings  = bookings.filter(b => b.status === 'pending_payment')
 
   if (loading) return (
     <main className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -130,10 +126,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
           <span className="text-lg font-black text-blue-600">MatchInWorld</span>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-600 font-medium">{user?.name}</span>
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors"
-            >
+            <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors">
               <IconLogout size={16} />
               {isAr ? 'خروج' : 'Logout'}
             </button>
@@ -152,38 +145,28 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
           </p>
         </motion.div>
 
-        {/* Quick actions */}
-        <motion.div
-          className="grid grid-cols-2 md:grid-cols-4 gap-4"
-          variants={fadeUp} custom={1} initial="hidden" animate="show"
-        >
+        <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-4" variants={fadeUp} custom={1} initial="hidden" animate="show">
           {[
-            { icon: IconSparkles, ar: 'ابحث بالذكاء', en: 'AI Match',      href: `/${safeLang}/match`,        color: 'bg-blue-600 text-white' },
-            { icon: IconSearch,   ar: 'تصفح',          en: 'Browse',        href: `/${safeLang}/specialists`,  color: 'bg-white text-gray-700 border border-gray-200' },
-            { icon: IconWallet,   ar: 'محفظتي',         en: 'My Wallet',     href: `/${safeLang}/wallet`,       color: 'bg-white text-gray-700 border border-gray-200' },
-            { icon: IconUser,     ar: 'بروفايلي',       en: 'My Profile',    href: `/${safeLang}/profile/edit`, color: 'bg-white text-gray-700 border border-gray-200' },
+            { icon: IconSparkles, ar: 'ابحث بالذكاء', en: 'AI Match',   href: `/${safeLang}/match`,        color: 'bg-blue-600 text-white' },
+            { icon: IconSearch,   ar: 'تصفح',          en: 'Browse',     href: `/${safeLang}/specialists`,  color: 'bg-white text-gray-700 border border-gray-200' },
+            { icon: IconWallet,   ar: 'محفظتي',         en: 'My Wallet',  href: `/${safeLang}/wallet`,       color: 'bg-white text-gray-700 border border-gray-200' },
+            { icon: IconUser,     ar: 'بروفايلي',       en: 'My Profile', href: `/${safeLang}/profile/edit`, color: 'bg-white text-gray-700 border border-gray-200' },
           ].map((action, i) => (
-            <Link
-              key={i}
-              href={action.href}
-              className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-medium text-sm transition-all hover:-translate-y-1 hover:shadow-md ${action.color}`}
-            >
+            <Link key={i} href={action.href}
+              className={`flex flex-col items-center gap-2 p-4 rounded-2xl font-medium text-sm transition-all hover:-translate-y-1 hover:shadow-md ${action.color}`}>
               <action.icon size={22} />
               {isAr ? action.ar : action.en}
             </Link>
           ))}
         </motion.div>
 
-        {/* Wallet */}
         {wallet && (
           <motion.div variants={fadeUp} custom={2} initial="hidden" animate="show"
             className="bg-gradient-to-r from-blue-600 to-violet-600 rounded-3xl p-6 text-white">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-blue-100 text-sm">{isAr ? 'رصيد محفظتك' : 'Wallet Balance'}</p>
-                <p className="text-3xl font-black mt-1">
-                  {wallet.balance ?? 0} <span className="text-lg font-normal">{isAr ? 'ج' : 'EGP'}</span>
-                </p>
+                <p className="text-3xl font-black mt-1">{wallet.balance ?? 0} <span className="text-lg font-normal">{isAr ? 'ج' : 'EGP'}</span></p>
               </div>
               <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
                 <IconWallet size={24} />
@@ -192,7 +175,6 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
           </motion.div>
         )}
 
-        {/* Pending payments */}
         {pendingBookings.length > 0 && (
           <motion.div variants={fadeUp} custom={3} initial="hidden" animate="show">
             <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
@@ -202,9 +184,7 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
               {pendingBookings.map(b => (
                 <div key={b.id} className="flex items-center justify-between bg-white rounded-xl p-3 mt-2">
                   <div>
-                    <p className="text-sm font-medium text-gray-900">
-                      {b.specialists?.users?.name}
-                    </p>
+                    <p className="text-sm font-medium text-gray-900">{b.specialists?.users?.name}</p>
                     <p className="text-xs text-gray-500 mt-0.5">
                       {new Date(b.scheduled_at).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
                     </p>
@@ -218,7 +198,6 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
           </motion.div>
         )}
 
-        {/* Upcoming sessions */}
         <motion.div variants={fadeUp} custom={4} initial="hidden" animate="show">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-black text-gray-900">{isAr ? 'جلساتي القادمة' : 'Upcoming Sessions'}</h2>
@@ -233,16 +212,10 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
               <div className="w-14 h-14 bg-blue-50 rounded-2xl flex items-center justify-center mx-auto mb-4">
                 <IconCalendar size={26} className="text-blue-400" />
               </div>
-              <p className="font-semibold text-gray-900 mb-1">
-                {isAr ? 'لا توجد جلسات قادمة' : 'No upcoming sessions'}
-              </p>
-              <p className="text-sm text-gray-500 mb-4">
-                {isAr ? 'احجز جلستك الأولى الآن' : 'Book your first session now'}
-              </p>
-              <Link
-                href={`/${safeLang}/match`}
-                className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all"
-              >
+              <p className="font-semibold text-gray-900 mb-1">{isAr ? 'لا توجد جلسات قادمة' : 'No upcoming sessions'}</p>
+              <p className="text-sm text-gray-500 mb-4">{isAr ? 'احجز جلستك الأولى الآن' : 'Book your first session now'}</p>
+              <Link href={`/${safeLang}/match`}
+                className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all">
                 <IconSparkles size={16} />
                 {isAr ? 'ابحث بالذكاء' : 'AI Match'}
               </Link>

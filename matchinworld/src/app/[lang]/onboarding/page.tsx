@@ -1,6 +1,6 @@
 'use client'
 
-import { use, useState, useEffect } from 'react'
+import { use, useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useRouter } from 'next/navigation'
 import {
@@ -34,7 +34,7 @@ const DURATIONS = [30, 45, 60, 90]
 const CLIENT_STEPS = ['profile', 'needs']
 const SPEC_STEPS   = ['bio', 'specializations', 'pricing', 'kyc']
 
-const inputClass = "w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all text-gray-900 placeholder:text-gray-400 bg-white"
+const inputClass    = "w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all text-gray-900 placeholder:text-gray-400 bg-white"
 const textareaClass = "w-full px-4 py-3 rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all text-gray-900 placeholder:text-gray-400 bg-white resize-none leading-relaxed"
 
 export default function OnboardingPage({ params }: { params: Promise<{ lang: Locale }> }) {
@@ -111,6 +111,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
           gender:            clientData.gender,
           needs_description: clientData.needs,
         })
+        await supabase.auth.refreshSession()
         window.location.href = `/${safeLang}/dashboard`
       } else {
         let frontUrl = ''
@@ -120,25 +121,25 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
 
         await supabase.from('users').update({ role: 'specialist' }).eq('id', user.id)
         await supabase.from('specialists').upsert({
-          id:               user.id,
-          bio:              specData.bio,
-          price_per_hour:   parseInt(specData.price) || 0,
-          specializations:  specData.specializations,
+          id:                user.id,
+          bio:               specData.bio,
+          price_per_hour:    parseInt(specData.price) || 0,
+          specializations:   specData.specializations,
           session_durations: specData.durations,
-          kyc_front_url:    frontUrl,
-          kyc_back_url:     backUrl,
-          kyc_status:       'pending',
-          is_active:        false,
+          kyc_front_url:     frontUrl,
+          kyc_back_url:      backUrl,
+          kyc_status:        'pending',
+          is_active:         false,
         })
+        await supabase.auth.refreshSession()
         window.location.href = `/${safeLang}/waiting`
       }
     } catch {
       setError(isAr ? 'حدث خطأ، حاول مرة أخرى' : 'An error occurred, please try again')
+      setLoading(false)
     }
-    setLoading(false)
   }
 
-  // شاشة اختيار الـ role
   if (!roleSelected) return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-violet-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg">
@@ -202,12 +203,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
           <button
             type="button"
             disabled={role === ''}
-            onClick={() => {
-              if (role !== '') {
-                setStep(0)
-                setRoleSelected(true)
-              }
-            }}
+            onClick={() => { if (role !== '') { setStep(0); setRoleSelected(true) } }}
             className="w-full mt-6 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-40 disabled:cursor-not-allowed text-white font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-200"
           >
             {isAr ? 'التالي' : 'Next'}
@@ -403,7 +399,6 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
   return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-violet-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg">
-
         <div className="text-center mb-6">
           <span className="text-2xl font-black text-blue-600">MatchInWorld</span>
         </div>
