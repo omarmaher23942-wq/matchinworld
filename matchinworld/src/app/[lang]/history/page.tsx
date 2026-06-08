@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
   IconCalendar, IconClock, IconArrowLeft, IconArrowRight,
-  IconVideo, IconMessageCircle, IconStar, IconCheck,
+  IconVideo, IconStar, IconCheck,
   IconX, IconLoader2
 } from '@tabler/icons-react'
 import { type Locale } from '@/i18n/translations'
@@ -177,11 +177,7 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
                           <IconVideo size={14} />
                           {isAr ? 'انضم' : 'Join'}
                         </Link>
-                        <Link href={`/${safeLang}/chat/${b.id}`}
-                          className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition-all">
-                          <IconMessageCircle size={14} />
-                          {isAr ? 'محادثة' : 'Chat'}
-                        </Link>
+                        
                       </>
                     )}
                     {isCompleted && userRole === 'client' && !hasReview && (

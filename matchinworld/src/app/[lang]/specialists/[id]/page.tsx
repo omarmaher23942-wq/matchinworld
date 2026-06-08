@@ -394,13 +394,7 @@ export default function SpecialistProfilePage({
               {!bookingLoading && <Arrow size={18} />}
             </button>
 
-            <Link
-              href={`/${safeLang}/chat/new?specialist=${id}`}
-              className="w-full flex items-center justify-center gap-2 mt-3 border-2 border-gray-200 hover:border-blue-300 text-gray-700 hover:text-blue-600 font-medium py-3 rounded-2xl transition-all text-sm"
-            >
-              <IconMessageCircle size={18} />
-              {isAr ? 'راسل المتخصص' : 'Message Specialist'}
-            </Link>
+            
           </motion.div>
         </div>
 
