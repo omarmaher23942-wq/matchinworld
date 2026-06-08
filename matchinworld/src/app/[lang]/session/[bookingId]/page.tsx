@@ -1,4 +1,9 @@
 'use client'
+declare global {
+    interface Window {
+      DailyIframe: any
+    }
+  }
 
 import { use, useEffect, useState, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
