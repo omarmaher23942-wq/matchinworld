@@ -6,7 +6,6 @@ import { motion } from 'framer-motion'
 import { IconUser, IconLock, IconEye, IconEyeOff, IconArrowRight, IconArrowLeft } from '@tabler/icons-react'
 import { translations, type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
 
 export default function SignupPage({ params }: { params: Promise<{ lang: Locale }> }) {
   const { lang } = use(params)
@@ -14,7 +13,6 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
   const t = translations[safeLang]
   const isAr = safeLang === 'ar'
   const Arrow = isAr ? IconArrowLeft : IconArrowRight
-  const router = useRouter()
 
   const [form, setForm] = useState({ name: '', username: '', password: '' })
   const [showPass, setShowPass] = useState(false)
@@ -27,7 +25,6 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
       setError(isAr ? 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' : 'Username must be at least 3 characters')
       return
     }
-
     setLoading(true)
     setError('')
 
@@ -51,6 +48,9 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
     }
 
     if (data.user) {
+      sessionStorage.setItem('tmp_email', fakeEmail)
+      sessionStorage.setItem('tmp_pass', form.password)
+
       await supabase.from('users').insert({
         id:    data.user.id,
         email: fakeEmail,
@@ -78,63 +78,45 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
         <div className="bg-white rounded-3xl shadow-xl shadow-gray-100 border border-gray-100 p-8">
           <form onSubmit={handleSubmit} className="space-y-4">
 
-            {/* Full Name */}
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1.5">
                 {isAr ? 'الاسم الكامل' : 'Full Name'}
               </label>
               <div className="relative">
                 <IconUser size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-400" />
-                <input
-                  type="text"
-                  required
-                  value={form.name}
+                <input type="text" required value={form.name}
                   onChange={e => setForm({ ...form, name: e.target.value })}
                   className="w-full ps-10 pe-4 py-3 rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                  placeholder={isAr ? 'مثال: أحمد محمد' : 'e.g. John Doe'}
-                />
+                  placeholder={isAr ? 'مثال: أحمد محمد' : 'e.g. John Doe'} />
               </div>
             </div>
 
-            {/* Username */}
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1.5">
                 {isAr ? 'اسم المستخدم' : 'Username'}
               </label>
               <div className="relative">
                 <span className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-400 text-sm font-medium">@</span>
-                <input
-                  type="text"
-                  required
-                  value={form.username}
+                <input type="text" required value={form.username}
                   onChange={e => setForm({ ...form, username: e.target.value.replace(/\s/g, '').toLowerCase() })}
                   className="w-full ps-8 pe-4 py-3 rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                  placeholder={isAr ? 'مثال: ahmed123' : 'e.g. john123'}
-                />
+                  placeholder={isAr ? 'مثال: ahmed123' : 'e.g. john123'} />
               </div>
             </div>
 
-            {/* Password */}
             <div>
               <label className="text-sm font-medium text-gray-700 block mb-1.5">
                 {isAr ? 'كلمة المرور' : 'Password'}
               </label>
               <div className="relative">
                 <IconLock size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-400" />
-                <input
-                  type={showPass ? 'text' : 'password'}
-                  required
-                  minLength={6}
+                <input type={showPass ? 'text' : 'password'} required minLength={6}
                   value={form.password}
                   onChange={e => setForm({ ...form, password: e.target.value })}
                   className="w-full ps-10 pe-10 py-3 rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-                  placeholder="••••••••"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPass(!showPass)}
-                  className="absolute top-1/2 -translate-y-1/2 end-3 text-gray-400 hover:text-gray-600"
-                >
+                  placeholder="••••••••" />
+                <button type="button" onClick={() => setShowPass(!showPass)}
+                  className="absolute top-1/2 -translate-y-1/2 end-3 text-gray-400 hover:text-gray-600">
                   {showPass ? <IconEyeOff size={18} /> : <IconEye size={18} />}
                 </button>
               </div>
@@ -146,15 +128,9 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
               </div>
             )}
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-200 mt-2"
-            >
-              {loading
-                ? (isAr ? 'جاري الإنشاء...' : 'Creating...')
-                : (isAr ? 'إنشاء الحساب' : 'Create Account')
-              }
+            <button type="submit" disabled={loading}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-semibold py-3.5 rounded-xl transition-all shadow-lg shadow-blue-200 mt-2">
+              {loading ? (isAr ? 'جاري الإنشاء...' : 'Creating...') : (isAr ? 'إنشاء الحساب' : 'Create Account')}
               {!loading && <Arrow size={18} />}
             </button>
           </form>
