@@ -75,7 +75,7 @@ export default function ChatPage({
           table: 'messages',
           filter: `booking_id=eq.${bookingId}`,
         },
-        async (payload) => {
+        async (payload: any) => {
           const { data: msgWithUser } = await supabase
             .from('messages')
             .select('*, users(name)')
