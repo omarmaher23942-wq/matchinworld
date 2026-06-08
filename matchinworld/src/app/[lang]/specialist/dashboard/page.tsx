@@ -88,8 +88,8 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
       const { data: userData } = await supabase
         .from('users').select('*').eq('id', authUser.id).single()
 
-      if (!userData) { window.location.href = `/${safeLang}/onboarding`; return }
-      if (userData.role !== 'specialist') { window.location.href = `/${safeLang}/dashboard`; return }
+        if (!userData) { window.location.href = `/${safeLang}/auth/login`; return }
+        setUser(userData)
 
       setUser(userData)
 

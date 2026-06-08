@@ -83,10 +83,9 @@ export default function ClientDashboard({ params }: { params: Promise<{ lang: Lo
       const { data: userData } = await supabase
         .from('users').select('*').eq('id', authUser.id).single()
 
-      if (!userData) { window.location.href = `/${safeLang}/onboarding`; return }
-      if (userData.role === 'admin') { window.location.href = `/${safeLang}/admin`; return }
-      if (userData.role === 'specialist') { window.location.href = `/${safeLang}/specialist/dashboard`; return }
-      if (userData.role !== 'client') { window.location.href = `/${safeLang}/onboarding`; return }
+        if (!userData) { window.location.href = `/${safeLang}/auth/login`; return }
+        setUser(userData)
+      
 
       setUser(userData)
 
