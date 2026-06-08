@@ -5,7 +5,7 @@ import { motion } from 'framer-motion'
 import Link from 'next/link'
 import {
   IconCheck, IconStar, IconArrowRight, IconArrowLeft,
-  IconCalendar, IconLoader2, IconX
+  IconCalendar, IconLoader2
 } from '@tabler/icons-react'
 import { type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
@@ -45,7 +45,6 @@ export default function SessionEndPage({
         .single()
       setBooking(bookingData)
 
-      // تحقق لو عمل review قبل كده
       const { data: reviewData } = await supabase
         .from('reviews')
         .select('id')
@@ -70,7 +69,6 @@ export default function SessionEndPage({
       ai_validated:  false,
     })
 
-    // تحديث تقييم المتخصص
     const { data: allReviews } = await supabase
       .from('reviews')
       .select('rating')
@@ -78,7 +76,7 @@ export default function SessionEndPage({
       .eq('is_published', true)
 
     if (allReviews && allReviews.length > 0) {
-      const avg = allReviews.reduce((sum, r) => sum + r.rating, 0) / allReviews.length
+      const avg = allReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / allReviews.length
       await supabase.from('specialists').update({
         rating: Math.round(avg * 10) / 10,
         total_sessions: allReviews.length,
@@ -102,8 +100,6 @@ export default function SessionEndPage({
         animate={{ opacity: 1, scale: 1 }}
         className="w-full max-w-md"
       >
-
-        {/* Header */}
         <div className="text-center mb-8">
           <motion.div
             initial={{ scale: 0 }}
@@ -122,8 +118,6 @@ export default function SessionEndPage({
         </div>
 
         <div className="bg-gray-800 rounded-3xl border border-gray-700 p-6 space-y-5">
-
-          {/* Review section — للعميل فقط */}
           {isClient && !hasReview && !done && (
             <>
               <div>
@@ -148,7 +142,6 @@ export default function SessionEndPage({
                   placeholder={isAr ? 'شاركنا تجربتك (اختياري)...' : 'Share your experience (optional)...'}
                 />
               </div>
-
               <button
                 onClick={submitReview}
                 disabled={submitting}
@@ -159,7 +152,6 @@ export default function SessionEndPage({
                   : (isAr ? 'إرسال التقييم' : 'Submit Review')
                 }
               </button>
-
               <button
                 onClick={() => setDone(true)}
                 className="w-full text-gray-400 hover:text-gray-200 text-sm py-2 transition-all"
@@ -169,7 +161,6 @@ export default function SessionEndPage({
             </>
           )}
 
-          {/* Done state */}
           {(done || hasReview || !isClient) && (
             <>
               {done && !hasReview && (
@@ -178,7 +169,6 @@ export default function SessionEndPage({
                   <p className="text-white font-semibold">{isAr ? 'شكراً على تقييمك!' : 'Thanks for your review!'}</p>
                 </div>
               )}
-
               <div className="space-y-3">
                 <Link
                   href={`/${safeLang}/specialists/${booking?.specialist_id}`}
@@ -187,7 +177,6 @@ export default function SessionEndPage({
                   <IconCalendar size={18} />
                   {isAr ? 'احجز جلسة أخرى' : 'Book Another Session'}
                 </Link>
-
                 <Link
                   href={`/${safeLang}/dashboard`}
                   className="w-full flex items-center justify-center gap-2 bg-gray-700 hover:bg-gray-600 text-white font-medium py-3 rounded-2xl transition-all text-sm"
