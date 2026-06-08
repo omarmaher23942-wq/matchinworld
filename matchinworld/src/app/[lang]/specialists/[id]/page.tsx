@@ -6,10 +6,9 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   IconStar, IconClock, IconCalendar, IconShieldCheck,
-  IconArrowRight, IconArrowLeft, IconMessageCircle,
+  IconArrowRight, IconArrowLeft,
   IconBrain, IconTarget, IconBarbell, IconSalad,
   IconStethoscope, IconYoga, IconTrendingUp, IconSparkles,
-  IconChevronLeft, IconChevronRight
 } from '@tabler/icons-react'
 import { type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
@@ -97,10 +96,7 @@ export default function SpecialistProfilePage({
     if (!user) { window.location.href = `/${safeLang}/auth/login`; return }
 
     const { data: userData } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+      .from('users').select('role').eq('id', user.id).single()
 
     if (userData?.role !== 'client') {
       alert(isAr ? 'فقط العملاء يمكنهم الحجز' : 'Only clients can book sessions')
@@ -108,7 +104,6 @@ export default function SpecialistProfilePage({
       return
     }
 
-    // حساب التاريخ القادم للـ slot
     const today = new Date()
     const dayOfWeek = selectedSlot.day
     const daysUntil = (dayOfWeek - today.getDay() + 7) % 7 || 7
@@ -119,19 +114,19 @@ export default function SpecialistProfilePage({
 
     const amountClient     = Math.round(specialist.price_per_hour * 1.15)
     const amountSpecialist = Math.round(specialist.price_per_hour * 0.85)
-    const platformFee      = specialist.price_per_hour - amountSpecialist + (amountClient - specialist.price_per_hour)
+    const platformFee      = amountClient - amountSpecialist
 
     const { data: booking, error } = await supabase
       .from('bookings')
       .insert({
-        client_id:       user.id,
-        specialist_id:   id,
-        scheduled_at:    sessionDate.toISOString(),
-        duration_minutes: selectedDuration,
-        status:          'pending_payment',
-        amount_client:    amountClient,
+        client_id:         user.id,
+        specialist_id:     id,
+        scheduled_at:      sessionDate.toISOString(),
+        duration_minutes:  selectedDuration,
+        status:            'pending_payment',
+        amount_client:     amountClient,
         amount_specialist: amountSpecialist,
-        platform_fee:     platformFee,
+        platform_fee:      platformFee,
       })
       .select()
       .single()
@@ -145,7 +140,6 @@ export default function SpecialistProfilePage({
     window.location.href = `/${safeLang}/pay/${booking.id}`
   }
 
-  // توليد الـ time slots
   function generateSlots(startTime: string, endTime: string, duration: number) {
     const slots: string[] = []
     const [startH, startM] = startTime.split(':').map(Number)
@@ -174,7 +168,6 @@ export default function SpecialistProfilePage({
   return (
     <main className="min-h-screen bg-gray-50">
 
-      {/* Navbar */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-5xl mx-auto px-6 h-16 flex items-center gap-4">
           <button
@@ -189,18 +182,20 @@ export default function SpecialistProfilePage({
 
       <div className="max-w-5xl mx-auto px-6 py-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
 
-        {/* Left: Profile */}
         <div className="lg:col-span-2 space-y-6">
 
           {/* Hero card */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-3xl border border-gray-100 p-6"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-3xl border border-gray-100 p-6">
             <div className="flex items-start gap-5">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-violet-100 rounded-2xl flex items-center justify-center text-3xl font-black text-blue-600 shrink-0">
-                {specialist.users?.name?.charAt(0) ?? '?'}
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-100 to-violet-100 rounded-2xl overflow-hidden flex items-center justify-center shrink-0">
+                {specialist.users?.avatar_url ? (
+                  <img src={specialist.users.avatar_url} alt={specialist.users?.name} className="w-full h-full object-cover" />
+                ) : (
+                  <span className="text-3xl font-black text-blue-600">
+                    {specialist.users?.name?.charAt(0) ?? '?'}
+                  </span>
+                )}
               </div>
               <div className="flex-1">
                 <div className="flex items-center gap-2 flex-wrap">
@@ -232,7 +227,6 @@ export default function SpecialistProfilePage({
                 </div>
               </div>
             </div>
-
             <div className="mt-5 pt-5 border-t border-gray-100">
               <h3 className="font-bold text-gray-900 mb-2">{isAr ? 'نبذة عني' : 'About Me'}</h3>
               <p className="text-sm text-gray-600 leading-relaxed">{specialist.bio}</p>
@@ -240,15 +234,10 @@ export default function SpecialistProfilePage({
           </motion.div>
 
           {/* Availability */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white rounded-3xl border border-gray-100 p-6"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}
+            className="bg-white rounded-3xl border border-gray-100 p-6">
             <h3 className="font-black text-gray-900 mb-4">{isAr ? 'المواعيد المتاحة' : 'Available Times'}</h3>
 
-            {/* Duration selector */}
             <div className="mb-4">
               <p className="text-sm text-gray-500 mb-2">{isAr ? 'مدة الجلسة' : 'Session Duration'}</p>
               <div className="flex gap-2 flex-wrap">
@@ -310,12 +299,8 @@ export default function SpecialistProfilePage({
 
           {/* Reviews */}
           {reviews.length > 0 && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="bg-white rounded-3xl border border-gray-100 p-6"
-            >
+            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}
+              className="bg-white rounded-3xl border border-gray-100 p-6">
               <h3 className="font-black text-gray-900 mb-4">{isAr ? 'التقييمات' : 'Reviews'}</h3>
               <div className="space-y-4">
                 {reviews.map(r => (
@@ -344,14 +329,10 @@ export default function SpecialistProfilePage({
           )}
         </div>
 
-        {/* Right: Booking card */}
+        {/* Booking card */}
         <div className="lg:col-span-1">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.15 }}
-            className="bg-white rounded-3xl border border-gray-100 p-6 sticky top-24"
-          >
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.15 }}
+            className="bg-white rounded-3xl border border-gray-100 p-6 sticky top-24">
             <h3 className="font-black text-gray-900 mb-4">{isAr ? 'احجز جلسة' : 'Book a Session'}</h3>
 
             <div className="bg-blue-50 rounded-2xl p-4 mb-5">
@@ -393,8 +374,6 @@ export default function SpecialistProfilePage({
               }
               {!bookingLoading && <Arrow size={18} />}
             </button>
-
-            
           </motion.div>
         </div>
 

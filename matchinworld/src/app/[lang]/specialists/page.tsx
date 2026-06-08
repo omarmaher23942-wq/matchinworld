@@ -78,22 +78,21 @@ export default function SpecialistsPage({ params }: { params: Promise<{ lang: Lo
   return (
     <main className="min-h-screen bg-gray-50">
 
-      {/* Navbar */}
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
           <Link href={`/${safeLang}`} className="text-lg font-black text-blue-600">MatchInWorld</Link>
-          <div className="flex items-center gap-3">
-            <Link href={`/${safeLang}/match`} className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all">
-              <IconSparkles size={16} />
-              {isAr ? 'ابحث بالذكاء' : 'AI Match'}
-            </Link>
-          </div>
+          <Link
+            href={`/${safeLang}/match`}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-all"
+          >
+            <IconSparkles size={16} />
+            {isAr ? 'ابحث بالذكاء' : 'AI Match'}
+          </Link>
         </div>
       </nav>
 
       <div className="max-w-6xl mx-auto px-6 py-8">
 
-        {/* Header */}
         <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show" className="mb-8">
           <h1 className="text-3xl font-black text-gray-900 mb-2">
             {isAr ? 'تصفح المتخصصين' : 'Browse Specialists'}
@@ -103,7 +102,6 @@ export default function SpecialistsPage({ params }: { params: Promise<{ lang: Lo
           </p>
         </motion.div>
 
-        {/* Search + Filter */}
         <motion.div variants={fadeUp} custom={1} initial="hidden" animate="show" className="mb-6 flex gap-3">
           <div className="relative flex-1">
             <IconSearch size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-400" />
@@ -129,7 +127,6 @@ export default function SpecialistsPage({ params }: { params: Promise<{ lang: Lo
           </button>
         </motion.div>
 
-        {/* Filters */}
         {showFilters && (
           <motion.div
             initial={{ opacity: 0, y: -10 }}
@@ -166,7 +163,6 @@ export default function SpecialistsPage({ params }: { params: Promise<{ lang: Lo
           </motion.div>
         )}
 
-        {/* Specialization tabs */}
         <motion.div variants={fadeUp} custom={2} initial="hidden" animate="show" className="flex gap-2 overflow-x-auto pb-2 mb-8 scrollbar-hide">
           {SPECIALIZATIONS.map(s => (
             <button
@@ -184,7 +180,6 @@ export default function SpecialistsPage({ params }: { params: Promise<{ lang: Lo
           ))}
         </motion.div>
 
-        {/* Specialists Grid */}
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-8 h-8 border-2 border-blue-600 border-t-transparent rounded-full animate-spin" />
@@ -206,10 +201,19 @@ export default function SpecialistsPage({ params }: { params: Promise<{ lang: Lo
                 animate="show"
                 whileHover={{ y: -4 }}
               >
-                <Link href={`/${safeLang}/specialists/${s.id}`} className="block bg-white rounded-2xl border border-gray-100 p-5 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50 transition-all">
+                <Link
+                  href={`/${safeLang}/specialists/${s.id}`}
+                  className="block bg-white rounded-2xl border border-gray-100 p-5 hover:border-blue-200 hover:shadow-lg hover:shadow-blue-50 transition-all"
+                >
                   <div className="flex items-start gap-4 mb-4">
-                    <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-violet-100 rounded-2xl flex items-center justify-center shrink-0 text-xl font-black text-blue-600">
-                      {s.users?.name?.charAt(0) ?? '?'}
+                    <div className="w-14 h-14 bg-gradient-to-br from-blue-100 to-violet-100 rounded-2xl overflow-hidden flex items-center justify-center shrink-0">
+                      {s.users?.avatar_url ? (
+                        <img src={s.users.avatar_url} alt={s.users?.name} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-xl font-black text-blue-600">
+                          {s.users?.name?.charAt(0) ?? '?'}
+                        </span>
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-bold text-gray-900 truncate">{s.users?.name}</h3>
