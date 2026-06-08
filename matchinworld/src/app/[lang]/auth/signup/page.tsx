@@ -48,17 +48,10 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
     }
 
     if (data.user) {
-      sessionStorage.setItem('tmp_email', fakeEmail)
-      sessionStorage.setItem('tmp_pass', form.password)
-
-      await supabase.from('users').insert({
-        id:    data.user.id,
-        email: fakeEmail,
-        name:  form.name,
-        role:  'pending',
-      })
-      window.location.href = `/${safeLang}/onboarding`
-    }
+        sessionStorage.setItem('tmp_email', fakeEmail)
+        sessionStorage.setItem('tmp_pass', form.password)
+        window.location.href = `/${safeLang}/onboarding`
+      }
     setLoading(false)
   }
 
