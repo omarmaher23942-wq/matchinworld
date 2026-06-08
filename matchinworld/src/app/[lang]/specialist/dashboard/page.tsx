@@ -11,23 +11,58 @@ import {
 } from '@tabler/icons-react'
 import { type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
+import { useSessionTimer } from '@/lib/use-session-timer'
 
 const fadeUp = {
   hidden: { opacity: 0, y: 20 },
   show: (i: number) => ({ opacity: 1, y: 0, transition: { delay: i * 0.08, duration: 0.4 } }),
 }
 
-function getJoinStatus(scheduledAt: string): 'early' | 'ready' | 'late' {
-  const sessionTime = new Date(scheduledAt).getTime()
-  const now = Date.now()
-  const diffMinutes = (sessionTime - now) / 1000 / 60
-  if (diffMinutes > 10) return 'early'
-  if (diffMinutes > -60) return 'ready'
-  return 'late'
-}
+function BookingCard({ b, safeLang, isAr }: { b: any; safeLang: string; isAr: boolean }) {
+  const { status, minutesUntil } = useSessionTimer(b.scheduled_at)
 
-function minutesUntil(scheduledAt: string): number {
-  return Math.ceil((new Date(scheduledAt).getTime() - Date.now()) / 1000 / 60)
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 hover:border-blue-100 transition-all">
+      <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center shrink-0">
+        <IconUsers size={22} className="text-blue-600" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-semibold text-gray-900 text-sm truncate">
+          {b.clients?.users?.name ?? (isAr ? 'عميل' : 'Client')}
+        </p>
+        <div className="flex items-center gap-3 mt-1">
+          <span className="text-xs text-gray-500 flex items-center gap-1">
+            <IconCalendar size={12} />
+            {new Date(b.scheduled_at).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
+          </span>
+          <span className="text-xs text-gray-500 flex items-center gap-1">
+            <IconClock size={12} />
+            {new Date(b.scheduled_at).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
+          </span>
+        </div>
+      </div>
+      <div className="shrink-0">
+        {status === 'early' && (
+          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">
+            {isAr ? `بعد ${minutesUntil} د` : `In ${minutesUntil}m`}
+          </span>
+        )}
+        {status === 'ready' && (
+          <Link
+            href={`/${safeLang}/session/${b.id}`}
+            className="bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all animate-pulse"
+          >
+            {isAr ? 'انضم الآن' : 'Join Now'}
+          </Link>
+        )}
+        {status === 'late' && (
+          <span className="text-xs text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">
+            {isAr ? 'انتهت' : 'Ended'}
+          </span>
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default function SpecialistDashboard({ params }: { params: Promise<{ lang: Locale }> }) {
@@ -88,7 +123,6 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
   }
 
   const upcomingBookings = bookings.filter(b => b.status === 'confirmed')
-  const pendingBookings  = bookings.filter(b => b.status === 'pending_payment')
   const completedCount   = bookings.filter(b => b.status === 'completed').length
 
   if (loading) return (
@@ -149,7 +183,6 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
           </div>
         </motion.div>
 
-        {/* Stats */}
         <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-4" variants={fadeUp} custom={1} initial="hidden" animate="show">
           {[
             { icon: IconWallet,   value: `${wallet?.balance ?? 0}`,   label: isAr ? 'رصيدي (ج)' : 'Balance (EGP)', color: 'bg-blue-600 text-white' },
@@ -165,12 +198,11 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
           ))}
         </motion.div>
 
-        {/* Quick actions */}
         <motion.div className="grid grid-cols-3 gap-4" variants={fadeUp} custom={2} initial="hidden" animate="show">
           {[
-            { icon: IconCalendar,   ar: 'مواعيدي',    en: 'Availability', href: `/${safeLang}/specialist/availability` },
-            { icon: IconWallet,     ar: 'أرباحي',     en: 'Earnings',     href: `/${safeLang}/specialist/earnings` },
-            { icon: IconTrendingUp, ar: 'تاريخ',      en: 'History',      href: `/${safeLang}/history` },
+            { icon: IconCalendar,   ar: 'مواعيدي', en: 'Availability', href: `/${safeLang}/specialist/availability` },
+            { icon: IconWallet,     ar: 'أرباحي',  en: 'Earnings',     href: `/${safeLang}/specialist/earnings` },
+            { icon: IconTrendingUp, ar: 'تاريخ',   en: 'History',      href: `/${safeLang}/history` },
           ].map((action, i) => (
             <Link key={i} href={action.href} className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-gray-100 hover:border-blue-200 hover:-translate-y-1 hover:shadow-md transition-all text-sm font-medium text-gray-700">
               <action.icon size={22} className="text-blue-600" />
@@ -179,7 +211,6 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
           ))}
         </motion.div>
 
-        {/* Upcoming sessions */}
         <motion.div variants={fadeUp} custom={4} initial="hidden" animate="show">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-black text-gray-900">{isAr ? 'جلساتي القادمة' : 'Upcoming Sessions'}</h2>
@@ -202,54 +233,13 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
             </div>
           ) : (
             <div className="space-y-3">
-              {upcomingBookings.map(b => {
-                const joinStatus = getJoinStatus(b.scheduled_at)
-                const mins = minutesUntil(b.scheduled_at)
-                return (
-                  <div key={b.id} className="bg-white rounded-2xl border border-gray-100 p-4 flex items-center gap-4 hover:border-blue-100 transition-all">
-                    <div className="w-12 h-12 bg-blue-100 rounded-2xl flex items-center justify-center shrink-0">
-                      <IconUsers size={22} className="text-blue-600" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-gray-900 text-sm truncate">
-                        {b.clients?.users?.name ?? (isAr ? 'عميل' : 'Client')}
-                      </p>
-                      <div className="flex items-center gap-3 mt-1">
-                        <span className="text-xs text-gray-500 flex items-center gap-1">
-                          <IconCalendar size={12} />
-                          {new Date(b.scheduled_at).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
-                        </span>
-                        <span className="text-xs text-gray-500 flex items-center gap-1">
-                          <IconClock size={12} />
-                          {new Date(b.scheduled_at).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="shrink-0">
-                      {joinStatus === 'early' && (
-                        <span className="text-xs text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">
-                          {isAr ? `بعد ${mins} د` : `In ${mins}m`}
-                        </span>
-                      )}
-                      {joinStatus === 'ready' && (
-                        <Link href={`/${safeLang}/session/${b.id}`} className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all animate-pulse">
-                          {isAr ? 'انضم الآن' : 'Join Now'}
-                        </Link>
-                      )}
-                      {joinStatus === 'late' && (
-                        <span className="text-xs text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">
-                          {isAr ? 'انتهت' : 'Ended'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
+              {upcomingBookings.map(b => (
+                <BookingCard key={b.id} b={b} safeLang={safeLang} isAr={isAr} />
+              ))}
             </div>
           )}
         </motion.div>
 
-        {/* Wallet */}
         {wallet && (
           <motion.div variants={fadeUp} custom={5} initial="hidden" animate="show">
             <div className="bg-gradient-to-r from-blue-600 to-violet-600 rounded-3xl p-6 text-white">

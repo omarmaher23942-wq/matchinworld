@@ -40,6 +40,24 @@ export default function SessionPage({
         .single()
 
       if (!bookingData) { router.push(`/${safeLang}/dashboard`); return }
+
+      // منع الانضمام قبل الميعاد بأكتر من 10 دقايق
+      const diffMinutes = (new Date(bookingData.scheduled_at).getTime() - Date.now()) / 1000 / 60
+      if (diffMinutes > 10) {
+        alert(isAr
+          ? `الجلسة لسه ما بدأتش — باقي ${Math.ceil(diffMinutes)} دقيقة`
+          : `Session hasn't started yet — ${Math.ceil(diffMinutes)} minutes remaining`
+        )
+        router.back()
+        return
+      }
+
+      if (bookingData.status !== 'confirmed') {
+        alert(isAr ? 'الجلسة غير مؤكدة بعد' : 'Session not confirmed yet')
+        router.back()
+        return
+      }
+
       setBooking(bookingData)
       setLoading(false)
     }
@@ -49,7 +67,6 @@ export default function SessionPage({
   useEffect(() => {
     if (!booking || !currentUser) return
 
-    // Load Jitsi script
     const script = document.createElement('script')
     script.src = 'https://meet.matchinworld.com/external_api.js'
     script.async = true
@@ -57,7 +74,7 @@ export default function SessionPage({
     document.head.appendChild(script)
 
     return () => {
-      document.head.removeChild(script)
+      if (document.head.contains(script)) document.head.removeChild(script)
     }
   }, [booking, currentUser])
 
@@ -65,9 +82,6 @@ export default function SessionPage({
     if (!window.JitsiMeetExternalAPI) return
 
     const roomName = `matchinworld-${bookingId}`
-    const otherPerson = currentUser?.role === 'client'
-      ? booking?.specialists?.users
-      : booking?.clients?.users
 
     const api = new window.JitsiMeetExternalAPI('meet.matchinworld.com', {
       roomName,
@@ -85,15 +99,14 @@ export default function SessionPage({
         defaultLanguage: isAr ? 'ar' : 'en',
         toolbarButtons: [
           'microphone', 'camera', 'desktop', 'fullscreen',
-          'fodeviceselection', 'hangup', 'chat', 'settings',
-          'videoquality', 'filmstrip', 'shortcuts', 'tileview',
+          'fodeviceselection', 'hangup', 'settings',
+          'videoquality', 'filmstrip', 'tileview',
         ],
       },
       interfaceConfigOverwrite: {
         SHOW_JITSI_WATERMARK: false,
         SHOW_WATERMARK_FOR_GUESTS: false,
         SHOW_BRAND_WATERMARK: false,
-        BRAND_WATERMARK_LINK: '',
         DEFAULT_BACKGROUND: '#111827',
         TOOLBAR_ALWAYS_VISIBLE: false,
       },
