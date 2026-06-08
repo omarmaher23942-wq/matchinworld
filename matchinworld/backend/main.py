@@ -5,7 +5,7 @@ import os
 
 load_dotenv()
 
-from routers import match, rooms
+from routers import match, rooms, signaling
 
 app = FastAPI(title="MatchInWorld API")
 
@@ -24,6 +24,7 @@ app.add_middleware(
 
 app.include_router(match.router, prefix="/api/match", tags=["match"])
 app.include_router(rooms.router, prefix="/api/rooms", tags=["rooms"])
+app.include_router(signaling.router, prefix="/signal", tags=["signaling"])
 
 @app.get("/")
 def root():

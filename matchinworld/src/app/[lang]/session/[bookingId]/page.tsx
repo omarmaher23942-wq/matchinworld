@@ -1,26 +1,30 @@
 'use client'
-declare global {
-    interface Window {
-      DailyIframe: any
-    }
-  }
 
-import { use, useEffect, useState, useRef } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
+declare global {
+  interface Window { localStream: MediaStream }
+}
+
+import { use, useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
-  IconVideo, IconVideoOff, IconMicrophone, IconMicrophoneOff,
-  IconPhone, IconMessageCircle, IconArrowLeft, IconArrowRight,
-  IconScreenShare, IconScreenShareOff, IconMaximize, IconMinimize
+  IconMicrophone, IconMicrophoneOff, IconVideo, IconVideoOff,
+  IconPhone, IconScreenShare, IconScreenShareOff,
+  IconArrowLeft, IconArrowRight, IconMaximize, IconMinimize
 } from '@tabler/icons-react'
 import { type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
 
-export default function SessionPage({
-  params
-}: {
-  params: Promise<{ lang: Locale; bookingId: string }>
-}) {
+const API_WS = process.env.NEXT_PUBLIC_API_URL?.replace('https://', 'wss://').replace('http://', 'ws://') ?? 'ws://localhost:8000'
+
+const ICE_SERVERS = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ]
+}
+
+export default function SessionPage({ params }: { params: Promise<{ lang: Locale; bookingId: string }> }) {
   const { lang, bookingId } = use(params)
   const safeLang = lang === 'ar' || lang === 'en' ? lang : 'ar'
   const isAr = safeLang === 'ar'
@@ -31,24 +35,23 @@ export default function SessionPage({
   const [booking, setBooking] = useState<any>(null)
   const [currentUser, setCurrentUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
-  const [joining, setJoining] = useState(false)
   const [inSession, setInSession] = useState(false)
-
-  // Controls
+  const [joining, setJoining] = useState(false)
+  const [mode, setMode] = useState<'video' | 'audio'>('video')
   const [videoOn, setVideoOn] = useState(true)
   const [audioOn, setAudioOn] = useState(true)
   const [screenSharing, setScreenSharing] = useState(false)
   const [fullscreen, setFullscreen] = useState(false)
-  const [showChat, setShowChat] = useState(false)
-  const [mode, setMode] = useState<'video' | 'audio'>('video')
   const [callDuration, setCallDuration] = useState(0)
-  const [messages, setMessages] = useState<any[]>([])
-  const [newMsg, setNewMsg] = useState('')
+  const [remoteConnected, setRemoteConnected] = useState(false)
 
-  // Daily.co
-  const callFrameRef = useRef<any>(null)
-  const containerRef = useRef<HTMLDivElement>(null)
-  const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const localVideoRef  = useRef<HTMLVideoElement>(null)
+  const remoteVideoRef = useRef<HTMLVideoElement>(null)
+  const pcRef          = useRef<RTCPeerConnection | null>(null)
+  const wsRef          = useRef<WebSocket | null>(null)
+  const localStreamRef = useRef<MediaStream | null>(null)
+  const timerRef       = useRef<NodeJS.Timeout | null>(null)
+  const containerRef   = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     async function load() {
@@ -66,160 +69,208 @@ export default function SessionPage({
         .single()
 
       if (!bookingData) { router.push(`/${safeLang}/dashboard`); return }
-      if (bookingData.status !== 'confirmed') {
-        alert(isAr ? 'الجلسة غير مؤكدة بعد' : 'Session not confirmed yet')
-        router.back()
-        return
-      }
-
-      // لو مفيش Daily room — إنشئه
-      if (!bookingData.daily_room_url) {
-        const res = await fetch('/api/create-room', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ bookingId }),
-        })
-        const { url } = await res.json()
-        await supabase.from('bookings').update({ daily_room_url: url }).eq('id', bookingId)
-        bookingData.daily_room_url = url
-      }
-
       setBooking(bookingData)
       setLoading(false)
     }
     load()
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
-      if (callFrameRef.current) callFrameRef.current.destroy()
+      cleanup()
     }
   }, [bookingId])
 
-  async function joinSession() {
-    if (!booking?.daily_room_url) return
-    setJoining(true)
+  function cleanup() {
+    if (timerRef.current) clearInterval(timerRef.current)
+    if (localStreamRef.current) {
+      localStreamRef.current.getTracks().forEach(t => t.stop())
+    }
+    if (pcRef.current) pcRef.current.close()
+    if (wsRef.current) wsRef.current.close()
+  }
 
+  async function joinSession() {
+    setJoining(true)
     try {
-      // Load Daily.co script
-      if (!window.DailyIframe) {
-        await new Promise<void>((resolve, reject) => {
-          const script = document.createElement('script')
-          script.src = 'https://unpkg.com/@daily-co/daily-js'
-          script.onload = () => resolve()
-          script.onerror = reject
-          document.head.appendChild(script)
-        })
+      // جيب الـ media stream
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: mode === 'video',
+        audio: true,
+      })
+      localStreamRef.current = stream
+
+      if (localVideoRef.current) {
+        localVideoRef.current.srcObject = stream
       }
 
-      const frame = window.DailyIframe.createFrame(containerRef.current!, {
-        showLeaveButton: false,
-        showFullscreenButton: false,
-        iframeStyle: {
-          width: '100%',
-          height: '100%',
-          border: 'none',
-          borderRadius: '16px',
-        },
-      })
+      // إنشئ WebSocket connection
+      const userId = currentUser?.id ?? 'user'
+      const ws = new WebSocket(`${API_WS}/signal/ws/${bookingId}/${userId}`)
+      wsRef.current = ws
 
-      callFrameRef.current = frame
+      // إنشئ RTCPeerConnection
+      const pc = new RTCPeerConnection(ICE_SERVERS)
+      pcRef.current = pc
 
-      frame.on('left-meeting', () => {
-        setInSession(false)
-        if (timerRef.current) clearInterval(timerRef.current)
-        window.location.href = `/${safeLang}/dashboard`
-      })
+      // إضافة الـ tracks
+      stream.getTracks().forEach(track => pc.addTrack(track, stream))
 
-      await frame.join({
-        url: booking.daily_room_url,
-        userName: currentUser?.name ?? 'User',
-        videoSource: mode === 'video',
-        audioSource: true,
-        startVideoOff: mode === 'audio',
-        startAudioOff: false,
-      })
+      // لما تيجي remote stream
+      pc.ontrack = (event) => {
+        if (remoteVideoRef.current) {
+          remoteVideoRef.current.srcObject = event.streams[0]
+          setRemoteConnected(true)
+        }
+      }
+
+      // ICE candidates
+      pc.onicecandidate = (event) => {
+        if (event.candidate && ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({
+            type: 'ice-candidate',
+            candidate: event.candidate
+          }))
+        }
+      }
+
+      pc.onconnectionstatechange = () => {
+        if (pc.connectionState === 'connected') {
+          setRemoteConnected(true)
+        } else if (pc.connectionState === 'disconnected' || pc.connectionState === 'failed') {
+          setRemoteConnected(false)
+        }
+      }
+
+      // WebSocket messages
+      ws.onopen = async () => {
+        // الأول يدخل يبعت offer
+        setTimeout(async () => {
+          if (pc.signalingState === 'stable') {
+            try {
+              const offer = await pc.createOffer()
+              await pc.setLocalDescription(offer)
+              ws.send(JSON.stringify({ type: 'offer', sdp: offer }))
+            } catch {}
+          }
+        }, 1000)
+      }
+
+      ws.onmessage = async (event) => {
+        const msg = JSON.parse(event.data)
+
+        if (msg.type === 'offer') {
+          await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp))
+          const answer = await pc.createAnswer()
+          await pc.setLocalDescription(answer)
+          ws.send(JSON.stringify({ type: 'answer', sdp: answer }))
+
+        } else if (msg.type === 'answer') {
+          if (pc.signalingState === 'have-local-offer') {
+            await pc.setRemoteDescription(new RTCSessionDescription(msg.sdp))
+          }
+
+        } else if (msg.type === 'ice-candidate') {
+          try {
+            await pc.addIceCandidate(new RTCIceCandidate(msg.candidate))
+          } catch {}
+
+        } else if (msg.type === 'user-joined') {
+          // الشخص التاني دخل — ابعت offer
+          if (pc.signalingState === 'stable') {
+            const offer = await pc.createOffer()
+            await pc.setLocalDescription(offer)
+            ws.send(JSON.stringify({ type: 'offer', sdp: offer }))
+          }
+
+        } else if (msg.type === 'user-left') {
+          setRemoteConnected(false)
+          if (remoteVideoRef.current) remoteVideoRef.current.srcObject = null
+        }
+      }
 
       setInSession(true)
       setJoining(false)
 
       // Start timer
-      timerRef.current = setInterval(() => {
-        setCallDuration(prev => prev + 1)
-      }, 1000)
+      timerRef.current = setInterval(() => setCallDuration(p => p + 1), 1000)
 
     } catch (err) {
       console.error(err)
-      alert(isAr ? 'فشل الانضمام، تأكد من السماح للكاميرا والميكروفون' : 'Failed to join, check camera/mic permissions')
+      alert(isAr ? 'فشل الانضمام — تأكد من السماح للكاميرا والميكروفون' : 'Failed to join — check camera/mic permissions')
       setJoining(false)
     }
   }
 
-  async function toggleVideo() {
-    if (!callFrameRef.current) return
-    if (videoOn) {
-      await callFrameRef.current.setLocalVideo(false)
-    } else {
-      await callFrameRef.current.setLocalVideo(true)
+  function toggleVideo() {
+    if (!localStreamRef.current) return
+    const track = localStreamRef.current.getVideoTracks()[0]
+    if (track) {
+      track.enabled = !videoOn
+      setVideoOn(!videoOn)
     }
-    setVideoOn(!videoOn)
   }
 
-  async function toggleAudio() {
-    if (!callFrameRef.current) return
-    if (audioOn) {
-      await callFrameRef.current.setLocalAudio(false)
-    } else {
-      await callFrameRef.current.setLocalAudio(true)
+  function toggleAudio() {
+    if (!localStreamRef.current) return
+    const track = localStreamRef.current.getAudioTracks()[0]
+    if (track) {
+      track.enabled = !audioOn
+      setAudioOn(!audioOn)
     }
-    setAudioOn(!audioOn)
   }
 
   async function toggleScreenShare() {
-    if (!callFrameRef.current) return
-    if (screenSharing) {
-      await callFrameRef.current.stopScreenShare()
+    if (!pcRef.current || !localStreamRef.current) return
+    if (!screenSharing) {
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true })
+        const screenTrack = screenStream.getVideoTracks()[0]
+        const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
+        if (sender) await sender.replaceTrack(screenTrack)
+        if (localVideoRef.current) localVideoRef.current.srcObject = screenStream
+        screenTrack.onended = () => stopScreenShare()
+        setScreenSharing(true)
+      } catch {}
     } else {
-      await callFrameRef.current.startScreenShare()
+      stopScreenShare()
     }
-    setScreenSharing(!screenSharing)
+  }
+
+  async function stopScreenShare() {
+    if (!pcRef.current || !localStreamRef.current) return
+    const camTrack = localStreamRef.current.getVideoTracks()[0]
+    const sender = pcRef.current.getSenders().find(s => s.track?.kind === 'video')
+    if (sender && camTrack) await sender.replaceTrack(camTrack)
+    if (localVideoRef.current) localVideoRef.current.srcObject = localStreamRef.current
+    setScreenSharing(false)
+  }
+
+  function toggleFullscreen() {
+    if (!fullscreen) {
+      containerRef.current?.requestFullscreen()
+    } else {
+      document.exitFullscreen()
+    }
+    setFullscreen(!fullscreen)
   }
 
   async function leaveSession() {
-    if (callFrameRef.current) {
-      await callFrameRef.current.leave()
-    }
-    if (timerRef.current) clearInterval(timerRef.current)
-    window.location.href = `/${safeLang}/dashboard`
+    cleanup()
+    // تحديث حالة الجلسة
+    await supabase.from('bookings')
+      .update({ status: 'completed' })
+      .eq('id', bookingId)
+      .eq('status', 'confirmed')
+    window.location.href = `/${safeLang}/session/${bookingId}/end`
   }
 
-  function formatDuration(seconds: number) {
-    const h = Math.floor(seconds / 3600)
-    const m = Math.floor((seconds % 3600) / 60)
-    const s = seconds % 60
-    if (h > 0) return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-    return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`
-  }
-
-  async function sendChatMsg() {
-    if (!newMsg.trim() || !currentUser) return
-    await supabase.from('messages').insert({
-      booking_id: bookingId,
-      sender_id: currentUser.id,
-      content: newMsg.trim(),
-    })
-    setMessages(prev => [...prev, {
-      content: newMsg.trim(),
-      sender_id: currentUser.id,
-      users: { name: currentUser.name },
-      created_at: new Date().toISOString(),
-    }])
-    setNewMsg('')
+  function formatDuration(s: number) {
+    const m = Math.floor(s / 60)
+    const sec = s % 60
+    return `${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}`
   }
 
   const otherPerson = booking
-    ? (currentUser?.role === 'client'
-        ? booking.specialists?.users
-        : booking.clients?.users)
+    ? (currentUser?.role === 'client' ? booking.specialists?.users : booking.clients?.users)
     : null
 
   if (loading) return (
@@ -228,7 +279,7 @@ export default function SessionPage({
     </main>
   )
 
-  // Pre-join screen
+  // Pre-join
   if (!inSession) return (
     <main className="min-h-screen bg-gray-900 flex items-center justify-center px-4">
       <motion.div
@@ -239,11 +290,9 @@ export default function SessionPage({
         <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-violet-500 rounded-3xl flex items-center justify-center text-3xl font-black text-white mx-auto mb-6">
           {otherPerson?.name?.charAt(0) ?? '?'}
         </div>
-
         <h2 className="text-xl font-black text-white mb-2">
           {isAr ? `جلسة مع ${otherPerson?.name}` : `Session with ${otherPerson?.name}`}
         </h2>
-
         <p className="text-gray-400 text-sm mb-6">
           {new Date(booking?.scheduled_at).toLocaleDateString(isAr ? 'ar-EG' : 'en-US')}
           {' — '}
@@ -254,36 +303,26 @@ export default function SessionPage({
         <div className="flex gap-3 mb-6">
           <button
             onClick={() => setMode('video')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all ${
-              mode === 'video'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all ${mode === 'video' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
           >
             <IconVideo size={18} />
             {isAr ? 'فيديو' : 'Video'}
           </button>
           <button
             onClick={() => setMode('audio')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all ${
-              mode === 'audio'
-                ? 'bg-blue-600 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-semibold transition-all ${mode === 'audio' ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
           >
             <IconMicrophone size={18} />
             {isAr ? 'صوت فقط' : 'Audio Only'}
           </button>
         </div>
 
-        {/* Pre-join controls */}
         <div className="flex items-center justify-center gap-4 mb-8">
           <div className="text-center">
             <button
               onClick={() => setVideoOn(!videoOn)}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-                videoOn && mode === 'video' ? 'bg-gray-700 text-white' : 'bg-red-500/20 text-red-400'
-              }`}
+              disabled={mode === 'audio'}
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all disabled:opacity-30 ${videoOn && mode === 'video' ? 'bg-gray-700 text-white' : 'bg-red-500/20 text-red-400'}`}
             >
               {videoOn && mode === 'video' ? <IconVideo size={20} /> : <IconVideoOff size={20} />}
             </button>
@@ -292,9 +331,7 @@ export default function SessionPage({
           <div className="text-center">
             <button
               onClick={() => setAudioOn(!audioOn)}
-              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-                audioOn ? 'bg-gray-700 text-white' : 'bg-red-500/20 text-red-400'
-              }`}
+              className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${audioOn ? 'bg-gray-700 text-white' : 'bg-red-500/20 text-red-400'}`}
             >
               {audioOn ? <IconMicrophone size={20} /> : <IconMicrophoneOff size={20} />}
             </button>
@@ -307,127 +344,104 @@ export default function SessionPage({
           disabled={joining}
           className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-bold py-4 rounded-2xl transition-all"
         >
-          {joining
-            ? (isAr ? 'جاري الانضمام...' : 'Joining...')
-            : (isAr ? 'انضم للجلسة' : 'Join Session')
-          }
+          {joining ? (isAr ? 'جاري الانضمام...' : 'Joining...') : (isAr ? 'انضم للجلسة' : 'Join Session')}
         </button>
 
-        <button
-          onClick={() => router.back()}
-          className="w-full mt-3 text-gray-400 hover:text-gray-200 text-sm py-2 transition-all"
-        >
+        <button onClick={() => router.back()} className="w-full mt-3 text-gray-400 hover:text-gray-200 text-sm py-2">
           {isAr ? 'رجوع' : 'Go back'}
         </button>
       </motion.div>
     </main>
   )
 
-  // In-session screen
+  // In-session
   return (
-    <main className="h-screen bg-gray-900 flex flex-col overflow-hidden">
+    <main ref={containerRef} className="h-screen bg-gray-900 flex flex-col overflow-hidden">
 
       {/* Top bar */}
-      <div className="flex items-center justify-between px-4 py-3 bg-gray-900/80 backdrop-blur-sm shrink-0">
+      <div className="flex items-center justify-between px-4 py-3 bg-black/40 backdrop-blur-sm shrink-0 z-10">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-violet-500 rounded-xl flex items-center justify-center text-white text-xs font-black">
             {otherPerson?.name?.charAt(0) ?? '?'}
           </div>
           <div>
             <p className="text-white text-sm font-semibold">{otherPerson?.name}</p>
-            <p className="text-green-400 text-xs">{formatDuration(callDuration)}</p>
+            <p className={`text-xs font-medium ${remoteConnected ? 'text-green-400' : 'text-yellow-400'}`}>
+              {remoteConnected
+                ? formatDuration(callDuration)
+                : (isAr ? 'في انتظار الانضمام...' : 'Waiting to join...')
+              }
+            </p>
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-xs text-gray-400 bg-gray-800 px-2 py-1 rounded-lg">
+          <span className="text-xs text-gray-400 bg-gray-800/60 px-2 py-1 rounded-lg">
             {mode === 'video' ? (isAr ? 'فيديو' : 'Video') : (isAr ? 'صوت' : 'Audio')}
           </span>
+          <button onClick={toggleFullscreen} className="w-8 h-8 bg-gray-700/60 text-gray-300 rounded-xl flex items-center justify-center hover:bg-gray-600 transition-all">
+            {fullscreen ? <IconMinimize size={16} /> : <IconMaximize size={16} />}
+          </button>
         </div>
       </div>
 
-      {/* Video container */}
+      {/* Video area */}
       <div className="flex-1 relative">
-        <div
-          ref={containerRef}
-          className="w-full h-full"
+
+        {/* Remote video */}
+        <video
+          ref={remoteVideoRef}
+          autoPlay
+          playsInline
+          className="w-full h-full object-cover"
           style={{ background: '#111827' }}
         />
 
-        {/* Audio only overlay */}
-        {mode === 'audio' && (
+        {/* Remote audio-only overlay */}
+        {!remoteConnected && (
           <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
             <div className="text-center">
               <motion.div
-                animate={{ scale: [1, 1.1, 1] }}
+                animate={{ scale: [1, 1.08, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
                 className="w-24 h-24 bg-gradient-to-br from-blue-500 to-violet-500 rounded-full flex items-center justify-center text-white text-3xl font-black mx-auto mb-4"
               >
                 {otherPerson?.name?.charAt(0) ?? '?'}
               </motion.div>
               <p className="text-white font-semibold">{otherPerson?.name}</p>
-              <p className="text-green-400 text-sm mt-1">{formatDuration(callDuration)}</p>
+              <p className="text-yellow-400 text-sm mt-1">
+                {isAr ? 'في انتظار الانضمام...' : 'Waiting for other person...'}
+              </p>
             </div>
           </div>
         )}
 
-        {/* Chat panel */}
-        <AnimatePresence>
-          {showChat && (
-            <motion.div
-              initial={{ x: isAr ? -320 : 320, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: isAr ? -320 : 320, opacity: 0 }}
-              className="absolute top-0 end-0 w-80 h-full bg-gray-800 border-s border-gray-700 flex flex-col"
-            >
-              <div className="p-4 border-b border-gray-700">
-                <p className="text-white font-semibold text-sm">
-                  {isAr ? 'المحادثة' : 'Chat'}
-                </p>
+        {/* Local video (PIP) */}
+        <div className="absolute bottom-4 end-4 w-36 h-24 rounded-2xl overflow-hidden border-2 border-gray-600 shadow-xl bg-gray-800">
+          <video
+            ref={localVideoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full h-full object-cover"
+          />
+          {(!videoOn || mode === 'audio') && (
+            <div className="absolute inset-0 bg-gray-800 flex items-center justify-center">
+              <div className="w-10 h-10 bg-blue-600 rounded-full flex items-center justify-center text-white text-sm font-black">
+                {currentUser?.name?.charAt(0) ?? '?'}
               </div>
-              <div className="flex-1 overflow-y-auto p-4 space-y-3">
-                {messages.map((msg, i) => (
-                  <div key={i} className={`flex ${msg.sender_id === currentUser?.id ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-48 px-3 py-2 rounded-xl text-sm ${
-                      msg.sender_id === currentUser?.id
-                        ? 'bg-blue-600 text-white'
-                        : 'bg-gray-700 text-gray-100'
-                    }`}>
-                      {msg.content}
-                    </div>
-                  </div>
-                ))}
-              </div>
-              <div className="p-3 border-t border-gray-700 flex gap-2">
-                <input
-                  type="text"
-                  value={newMsg}
-                  onChange={e => setNewMsg(e.target.value)}
-                  onKeyDown={e => e.key === 'Enter' && sendChatMsg()}
-                  className="flex-1 bg-gray-700 text-white placeholder:text-gray-400 text-sm px-3 py-2 rounded-xl outline-none border border-gray-600 focus:border-blue-500"
-                  placeholder={isAr ? 'رسالة...' : 'Message...'}
-                />
-                <button
-                  onClick={sendChatMsg}
-                  className="w-9 h-9 bg-blue-600 hover:bg-blue-700 text-white rounded-xl flex items-center justify-center transition-all"
-                >
-                  <IconArrowRight size={16} />
-                </button>
-              </div>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </div>
       </div>
 
-      {/* Controls bar */}
-      <div className="bg-gray-900/90 backdrop-blur-sm px-6 py-4 shrink-0">
-        <div className="flex items-center justify-center gap-3 max-w-lg mx-auto">
+      {/* Controls */}
+      <div className="bg-black/60 backdrop-blur-sm px-6 py-4 shrink-0">
+        <div className="flex items-center justify-center gap-3 max-w-sm mx-auto">
 
           {/* Mic */}
           <button
             onClick={toggleAudio}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-              audioOn ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-red-500 text-white hover:bg-red-600'
-            }`}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${audioOn ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-red-500 text-white hover:bg-red-600'}`}
           >
             {audioOn ? <IconMicrophone size={20} /> : <IconMicrophoneOff size={20} />}
           </button>
@@ -436,45 +450,33 @@ export default function SessionPage({
           <button
             onClick={toggleVideo}
             disabled={mode === 'audio'}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all disabled:opacity-30 ${
-              videoOn && mode === 'video' ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-red-500 text-white hover:bg-red-600'
-            }`}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all disabled:opacity-30 ${videoOn && mode === 'video' ? 'bg-gray-700 text-white hover:bg-gray-600' : 'bg-red-500 text-white hover:bg-red-600'}`}
           >
             {videoOn && mode === 'video' ? <IconVideo size={20} /> : <IconVideoOff size={20} />}
-          </button>
-
-          {/* Switch mode */}
-          <button
-            onClick={() => {
-              const newMode = mode === 'video' ? 'audio' : 'video'
-              setMode(newMode)
-              if (callFrameRef.current) {
-                callFrameRef.current.setLocalVideo(newMode === 'video')
-              }
-            }}
-            className="w-12 h-12 rounded-2xl bg-gray-700 text-white hover:bg-gray-600 flex items-center justify-center transition-all"
-          >
-            {mode === 'video' ? <IconMicrophone size={20} /> : <IconVideo size={20} />}
           </button>
 
           {/* Screen share */}
           <button
             onClick={toggleScreenShare}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-              screenSharing ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'
-            }`}
+            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${screenSharing ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'}`}
           >
             {screenSharing ? <IconScreenShareOff size={20} /> : <IconScreenShare size={20} />}
           </button>
 
-          {/* Chat */}
+          {/* Switch mode */}
           <button
-            onClick={() => setShowChat(!showChat)}
-            className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all ${
-              showChat ? 'bg-blue-600 text-white' : 'bg-gray-700 text-white hover:bg-gray-600'
-            }`}
+            onClick={async () => {
+              const newMode = mode === 'video' ? 'audio' : 'video'
+              setMode(newMode)
+              if (localStreamRef.current) {
+                const track = localStreamRef.current.getVideoTracks()[0]
+                if (track) track.enabled = newMode === 'video'
+              }
+              setVideoOn(newMode === 'video')
+            }}
+            className="w-12 h-12 rounded-2xl bg-gray-700 text-white hover:bg-gray-600 flex items-center justify-center transition-all"
           >
-            <IconMessageCircle size={20} />
+            {mode === 'video' ? <IconMicrophone size={20} /> : <IconVideo size={20} />}
           </button>
 
           {/* End call */}
@@ -484,19 +486,12 @@ export default function SessionPage({
           >
             <IconPhone size={20} className="rotate-[135deg]" />
           </button>
-
         </div>
 
         <p className="text-center text-xs text-gray-500 mt-2">
-          {mode === 'video'
-            ? (isAr ? 'وضع الفيديو' : 'Video Mode')
-            : (isAr ? 'وضع الصوت فقط' : 'Audio Only Mode')
-          }
-          {' • '}
-          {isAr ? 'اضغط على زر التبديل لتغيير الوضع' : 'Press switch button to change mode'}
+          {isAr ? 'اتصال مباشر آمن' : 'Secure peer-to-peer connection'}
         </p>
       </div>
-
     </main>
   )
 }
