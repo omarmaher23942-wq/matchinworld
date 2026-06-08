@@ -11,12 +11,42 @@ import {
 } from '@tabler/icons-react'
 import { type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
+import { useSessionTimer } from '@/lib/use-session-timer'
 
 const STATUS_STYLES: Record<string, { ar: string; en: string; class: string }> = {
-  pending_payment: { ar: 'انتظار الدفع',  en: 'Awaiting Payment', class: 'bg-amber-50 text-amber-600' },
-  confirmed:       { ar: 'مؤكد',          en: 'Confirmed',        class: 'bg-blue-50 text-blue-600' },
-  completed:       { ar: 'مكتمل',         en: 'Completed',        class: 'bg-green-50 text-green-600' },
-  cancelled:       { ar: 'ملغي',          en: 'Cancelled',        class: 'bg-red-50 text-red-500' },
+  pending_payment: { ar: 'في انتظار تأكيد الدفع', en: 'Awaiting Confirmation', class: 'bg-amber-50 text-amber-600' },
+  confirmed:       { ar: 'مؤكد',                   en: 'Confirmed',            class: 'bg-blue-50 text-blue-600' },
+  completed:       { ar: 'مكتمل',                  en: 'Completed',            class: 'bg-green-50 text-green-600' },
+  cancelled:       { ar: 'ملغي',                   en: 'Cancelled',            class: 'bg-red-50 text-red-500' },
+}
+
+function ConfirmedActions({ b, safeLang, isAr }: { b: any; safeLang: string; isAr: boolean }) {
+  const { status, minutesUntil } = useSessionTimer(b.scheduled_at)
+
+  return (
+    <>
+      {status === 'early' && (
+        <span className="text-xs text-gray-400 bg-gray-100 px-3 py-2 rounded-xl flex items-center gap-1">
+          <IconClock size={12} />
+          {isAr ? `ينضم بعد ${minutesUntil} د` : `Opens in ${minutesUntil}m`}
+        </span>
+      )}
+      {status === 'ready' && (
+        <Link
+          href={`/${safeLang}/session/${b.id}`}
+          className="flex items-center gap-1.5 bg-green-600 hover:bg-green-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all animate-pulse"
+        >
+          <IconVideo size={14} />
+          {isAr ? 'انضم الآن' : 'Join Now'}
+        </Link>
+      )}
+      {status === 'late' && (
+        <span className="text-xs text-gray-400 bg-gray-100 px-3 py-2 rounded-xl">
+          {isAr ? 'انتهت' : 'Ended'}
+        </span>
+      )}
+    </>
+  )
 }
 
 export default function HistoryPage({ params }: { params: Promise<{ lang: Locale }> }) {
@@ -47,7 +77,7 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
 
       let query = supabase
         .from('bookings')
-        .select('*, specialists(users(name, avatar_url)), clients(users(name, avatar_url)), reviews(id)')
+        .select('*, specialists(id, users(name, avatar_url)), clients(users(name, avatar_url)), reviews(id)')
         .order('scheduled_at', { ascending: false })
 
       if (userData?.role === 'client') {
@@ -80,12 +110,26 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
       ai_validated:  false,
     })
 
+    // تحديث تقييم المتخصص
+    const { data: allReviews } = await supabase
+      .from('reviews')
+      .select('rating')
+      .eq('specialist_id', booking?.specialist_id)
+      .eq('is_published', true)
+
+    if (allReviews && allReviews.length > 0) {
+      const avg = allReviews.reduce((sum: number, r: any) => sum + r.rating, 0) / allReviews.length
+      await supabase.from('specialists').update({
+        rating: Math.round(avg * 10) / 10,
+        total_sessions: allReviews.length,
+      }).eq('id', booking?.specialist_id)
+    }
+
     setReviewBookingId(null)
     setRating(5)
     setComment('')
     setSubmittingReview(false)
 
-    // تحديث قائمة الحجوزات
     setBookings(prev => prev.map(b =>
       b.id === reviewBookingId ? { ...b, reviews: [{ id: 'done' }] } : b
     ))
@@ -101,7 +145,10 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
     <main className="min-h-screen bg-gray-50">
       <nav className="bg-white border-b border-gray-100 sticky top-0 z-40">
         <div className="max-w-3xl mx-auto px-6 h-16 flex items-center gap-4">
-          <button onClick={() => router.back()} className="w-9 h-9 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center transition-all">
+          <button
+            onClick={() => router.back()}
+            className="w-9 h-9 bg-gray-100 hover:bg-gray-200 rounded-xl flex items-center justify-center transition-all"
+          >
             <Arrow size={18} className="text-gray-600" />
           </button>
           <span className="text-lg font-black text-blue-600">MatchInWorld</span>
@@ -126,7 +173,7 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
               const status = STATUS_STYLES[b.status] ?? STATUS_STYLES.cancelled
               const hasReview = b.reviews?.length > 0
               const isCompleted = b.status === 'completed'
-              const isPending = b.status === 'pending_payment'
+              const isPending   = b.status === 'pending_payment'
               const isConfirmed = b.status === 'confirmed'
 
               return (
@@ -138,8 +185,12 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
                   className="bg-white rounded-2xl border border-gray-100 p-5"
                 >
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-violet-100 rounded-2xl flex items-center justify-center text-blue-600 font-black shrink-0">
-                      {other?.name?.charAt(0) ?? '?'}
+                    <div className="w-12 h-12 bg-gradient-to-br from-blue-100 to-violet-100 rounded-2xl overflow-hidden flex items-center justify-center text-blue-600 font-black shrink-0">
+                      {other?.avatar_url ? (
+                        <img src={other.avatar_url} alt={other.name} className="w-full h-full object-cover" />
+                      ) : (
+                        other?.name?.charAt(0) ?? '?'
+                      )}
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -157,29 +208,24 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
                           <IconClock size={12} />
                           {new Date(b.scheduled_at).toLocaleTimeString(isAr ? 'ar-EG' : 'en-US', { hour: '2-digit', minute: '2-digit' })}
                         </span>
-                        <span className="text-xs font-bold text-blue-600">{b.amount_client} {isAr ? 'ج' : 'EGP'}</span>
+                        <span className="text-xs font-bold text-blue-600">
+                          {b.amount_client} {isAr ? 'ج' : 'EGP'}
+                        </span>
                       </div>
                     </div>
                   </div>
 
-                  {/* Actions */}
                   <div className="flex items-center gap-2 mt-4 flex-wrap">
-                    {isPending && userRole === 'client' && (
-                      <Link href={`/${safeLang}/pay/${b.id}`}
-                        className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all">
-                        {isAr ? 'ادفع الآن' : 'Pay Now'}
-                      </Link>
+                    {isPending && (
+                      <span className="flex items-center gap-1.5 text-xs text-amber-600 bg-amber-50 border border-amber-200 px-3 py-2 rounded-xl font-medium">
+                        {isAr ? 'في انتظار تأكيد الدفع' : 'Awaiting payment confirmation'}
+                      </span>
                     )}
+
                     {isConfirmed && (
-                      <>
-                        <Link href={`/${safeLang}/session/${b.id}`}
-                          className="flex items-center gap-1.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold px-3 py-2 rounded-xl transition-all">
-                          <IconVideo size={14} />
-                          {isAr ? 'انضم' : 'Join'}
-                        </Link>
-                        
-                      </>
+                      <ConfirmedActions b={b} safeLang={safeLang} isAr={isAr} />
                     )}
+
                     {isCompleted && userRole === 'client' && !hasReview && (
                       <button
                         onClick={() => setReviewBookingId(b.id)}
@@ -189,15 +235,19 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
                         {isAr ? 'قيّم الجلسة' : 'Rate Session'}
                       </button>
                     )}
+
                     {isCompleted && hasReview && (
                       <span className="flex items-center gap-1 text-xs text-green-600 font-medium">
                         <IconCheck size={14} />
                         {isAr ? 'تم التقييم' : 'Reviewed'}
                       </span>
                     )}
-                    {isCompleted && (
-                      <Link href={`/${safeLang}/specialists/${b.specialist_id}`}
-                        className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition-all">
+
+                    {isCompleted && userRole === 'client' && (
+                      <Link
+                        href={`/${safeLang}/specialists/${b.specialists?.id}`}
+                        className="flex items-center gap-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs font-semibold px-3 py-2 rounded-xl transition-all"
+                      >
                         {isAr ? 'احجز مجدداً' : 'Book Again'}
                       </Link>
                     )}
@@ -219,7 +269,10 @@ export default function HistoryPage({ params }: { params: Promise<{ lang: Locale
           >
             <div className="flex items-center justify-between mb-5">
               <h3 className="font-black text-gray-900">{isAr ? 'قيّم الجلسة' : 'Rate Session'}</h3>
-              <button onClick={() => setReviewBookingId(null)} className="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center hover:bg-gray-200">
+              <button
+                onClick={() => setReviewBookingId(null)}
+                className="w-8 h-8 bg-gray-100 rounded-xl flex items-center justify-center hover:bg-gray-200"
+              >
                 <IconX size={16} />
               </button>
             </div>
