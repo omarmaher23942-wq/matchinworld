@@ -11,7 +11,12 @@ app = FastAPI(title="MatchInWorld API")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "https://matchinworld.com"],
+    allow_origins=[
+        "http://localhost:3000",
+        "https://matchinworld.vercel.app",
+        "https://matchinworld.com",
+        "https://www.matchinworld.com",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
