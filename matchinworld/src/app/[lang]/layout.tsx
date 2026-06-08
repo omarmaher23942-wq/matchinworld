@@ -1,6 +1,5 @@
 import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
-import { type Locale } from '@/i18n/translations'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -14,17 +13,13 @@ export default async function LangLayout({
   params,
 }: {
   children: React.ReactNode
-  params: Promise<{ lang: Locale }>
+  params: Promise<{ lang: string }>
 }) {
   const { lang } = await params
   const isArabic = lang === 'ar'
 
   return (
-    <div
-      dir={isArabic ? 'rtl' : 'ltr'}
-      lang={lang}
-      className={`${inter.className} min-h-screen`}
-    >
+    <div dir={isArabic ? 'rtl' : 'ltr'} lang={lang} className={inter.className}>
       {children}
     </div>
   )
