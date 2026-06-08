@@ -7,7 +7,8 @@ import Link from 'next/link'
 import {
   IconCalendar, IconWallet, IconStar, IconUsers,
   IconClock, IconSettings, IconLogout, IconChevronRight,
-  IconChevronLeft, IconTrendingUp, IconShieldCheck, IconAlertCircle
+  IconChevronLeft, IconTrendingUp, IconShieldCheck, IconAlertCircle,
+  IconUser
 } from '@tabler/icons-react'
 import { type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
@@ -138,10 +139,16 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
           <span className="text-lg font-black text-blue-600">MatchInWorld</span>
           <div className="flex items-center gap-3">
             <span className="text-sm text-gray-600 font-medium">{user?.name}</span>
-            <Link href={`/${safeLang}/specialist/profile/edit`} className="text-sm text-gray-500 hover:text-blue-600 transition-colors">
+            <Link
+              href={`/${safeLang}/specialist/profile/edit`}
+              className="w-9 h-9 bg-gray-100 hover:bg-blue-50 hover:text-blue-600 text-gray-500 rounded-xl flex items-center justify-center transition-all"
+            >
               <IconSettings size={18} />
             </Link>
-            <button onClick={handleLogout} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors">
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-red-500 transition-colors"
+            >
               <IconLogout size={16} />
               {isAr ? 'خروج' : 'Logout'}
             </button>
@@ -152,7 +159,8 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
       <div className="max-w-5xl mx-auto px-6 py-8 space-y-6">
 
         {specialist?.kyc_status === 'rejected' && (
-          <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show" className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
+          <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show"
+            className="bg-red-50 border border-red-200 rounded-2xl p-4 flex items-center gap-3">
             <IconAlertCircle size={20} className="text-red-500 shrink-0" />
             <div className="flex-1">
               <p className="font-semibold text-red-800 text-sm">{isAr ? 'تم رفض طلب التوثيق' : 'Verification Rejected'}</p>
@@ -164,25 +172,49 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
           </motion.div>
         )}
 
-        <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show">
-          <h1 className="text-2xl font-black text-gray-900">
-            {isAr ? `أهلاً، ${user?.name}` : `Welcome, ${user?.name}`}
-          </h1>
-          <div className="flex items-center gap-2 mt-1">
-            {specialist?.kyc_status === 'approved' ? (
-              <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2.5 py-1 rounded-full font-medium">
-                <IconShieldCheck size={12} />
-                {isAr ? 'موثّق' : 'Verified'}
-              </span>
-            ) : (
-              <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full font-medium">
-                <IconClock size={12} />
-                {isAr ? 'قيد المراجعة' : 'Pending Review'}
-              </span>
-            )}
+        {/* Welcome + Avatar */}
+        <motion.div variants={fadeUp} custom={0} initial="hidden" animate="show"
+          className="bg-white rounded-3xl border border-gray-100 p-6">
+          <div className="flex items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl overflow-hidden bg-gradient-to-br from-blue-100 to-violet-100 flex items-center justify-center shrink-0">
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.name} className="w-full h-full object-cover" />
+              ) : (
+                <span className="text-2xl font-black text-blue-600">{user?.name?.charAt(0) ?? '?'}</span>
+              )}
+            </div>
+            <div className="flex-1">
+              <h1 className="text-xl font-black text-gray-900">
+                {isAr ? `أهلاً، ${user?.name}` : `Welcome, ${user?.name}`}
+              </h1>
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
+                {specialist?.kyc_status === 'approved' ? (
+                  <span className="inline-flex items-center gap-1 text-xs text-green-600 bg-green-50 px-2.5 py-1 rounded-full font-medium">
+                    <IconShieldCheck size={12} />
+                    {isAr ? 'موثّق' : 'Verified'}
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2.5 py-1 rounded-full font-medium">
+                    <IconClock size={12} />
+                    {isAr ? 'قيد المراجعة' : 'Pending Review'}
+                  </span>
+                )}
+                <span className="text-xs text-gray-400">
+                  {specialist?.specializations?.slice(0, 2).join(' · ')}
+                </span>
+              </div>
+            </div>
+            <Link
+              href={`/${safeLang}/specialist/profile/edit`}
+              className="flex items-center gap-2 bg-blue-50 hover:bg-blue-100 text-blue-600 text-sm font-semibold px-4 py-2.5 rounded-xl transition-all shrink-0"
+            >
+              <IconUser size={16} />
+              {isAr ? 'تعديل البروفايل' : 'Edit Profile'}
+            </Link>
           </div>
         </motion.div>
 
+        {/* Stats */}
         <motion.div className="grid grid-cols-2 md:grid-cols-4 gap-4" variants={fadeUp} custom={1} initial="hidden" animate="show">
           {[
             { icon: IconWallet,   value: `${wallet?.balance ?? 0}`,   label: isAr ? 'رصيدي (ج)' : 'Balance (EGP)', color: 'bg-blue-600 text-white' },
@@ -198,19 +230,23 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
           ))}
         </motion.div>
 
-        <motion.div className="grid grid-cols-3 gap-4" variants={fadeUp} custom={2} initial="hidden" animate="show">
+        {/* Quick actions */}
+        <motion.div className="grid grid-cols-4 gap-4" variants={fadeUp} custom={2} initial="hidden" animate="show">
           {[
-            { icon: IconCalendar,   ar: 'مواعيدي', en: 'Availability', href: `/${safeLang}/specialist/availability` },
-            { icon: IconWallet,     ar: 'أرباحي',  en: 'Earnings',     href: `/${safeLang}/specialist/earnings` },
-            { icon: IconTrendingUp, ar: 'تاريخ',   en: 'History',      href: `/${safeLang}/history` },
+            { icon: IconCalendar,   ar: 'مواعيدي',       en: 'Availability', href: `/${safeLang}/specialist/availability` },
+            { icon: IconWallet,     ar: 'أرباحي',         en: 'Earnings',     href: `/${safeLang}/specialist/earnings` },
+            { icon: IconTrendingUp, ar: 'تاريخ الجلسات', en: 'History',      href: `/${safeLang}/history` },
+            { icon: IconUser,       ar: 'بروفايلي',       en: 'My Profile',   href: `/${safeLang}/specialist/profile/edit` },
           ].map((action, i) => (
-            <Link key={i} href={action.href} className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-gray-100 hover:border-blue-200 hover:-translate-y-1 hover:shadow-md transition-all text-sm font-medium text-gray-700">
+            <Link key={i} href={action.href}
+              className="flex flex-col items-center gap-2 p-4 bg-white rounded-2xl border border-gray-100 hover:border-blue-200 hover:-translate-y-1 hover:shadow-md transition-all text-sm font-medium text-gray-700">
               <action.icon size={22} className="text-blue-600" />
               {isAr ? action.ar : action.en}
             </Link>
           ))}
         </motion.div>
 
+        {/* Upcoming sessions */}
         <motion.div variants={fadeUp} custom={4} initial="hidden" animate="show">
           <div className="flex items-center justify-between mb-4">
             <h2 className="font-black text-gray-900">{isAr ? 'جلساتي القادمة' : 'Upcoming Sessions'}</h2>
@@ -226,7 +262,8 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
                 <IconCalendar size={26} className="text-blue-400" />
               </div>
               <p className="font-semibold text-gray-900 mb-1">{isAr ? 'لا توجد جلسات قادمة' : 'No upcoming sessions'}</p>
-              <Link href={`/${safeLang}/specialist/availability`} className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all mt-4">
+              <Link href={`/${safeLang}/specialist/availability`}
+                className="inline-flex items-center gap-2 bg-blue-600 text-white text-sm font-semibold px-5 py-2.5 rounded-xl hover:bg-blue-700 transition-all mt-4">
                 <IconCalendar size={16} />
                 {isAr ? 'إعداد المواعيد' : 'Set Availability'}
               </Link>
@@ -240,13 +277,16 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
           )}
         </motion.div>
 
+        {/* Wallet */}
         {wallet && (
           <motion.div variants={fadeUp} custom={5} initial="hidden" animate="show">
             <div className="bg-gradient-to-r from-blue-600 to-violet-600 rounded-3xl p-6 text-white">
               <div className="flex items-center justify-between mb-4">
                 <div>
                   <p className="text-blue-100 text-sm">{isAr ? 'إجمالي أرباحك' : 'Total Earnings'}</p>
-                  <p className="text-3xl font-black mt-1">{wallet.total_earned ?? 0} <span className="text-lg font-normal">{isAr ? 'ج' : 'EGP'}</span></p>
+                  <p className="text-3xl font-black mt-1">
+                    {wallet.total_earned ?? 0} <span className="text-lg font-normal">{isAr ? 'ج' : 'EGP'}</span>
+                  </p>
                 </div>
                 <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center">
                   <IconWallet size={24} />
@@ -257,13 +297,15 @@ export default function SpecialistDashboard({ params }: { params: Promise<{ lang
                   <p className="text-blue-100 text-xs">{isAr ? 'الرصيد المتاح' : 'Available'}</p>
                   <p className="font-bold text-sm mt-0.5">{wallet.balance ?? 0} {isAr ? 'ج' : 'EGP'}</p>
                 </div>
-                <Link href={`/${safeLang}/specialist/earnings`} className="ms-auto bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all self-end">
+                <Link href={`/${safeLang}/specialist/earnings`}
+                  className="ms-auto bg-white/20 hover:bg-white/30 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-all self-end">
                   {isAr ? 'طلب سحب' : 'Withdraw'}
                 </Link>
               </div>
             </div>
           </motion.div>
         )}
+
       </div>
     </main>
   )
