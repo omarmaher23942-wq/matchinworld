@@ -31,7 +31,6 @@ const SPECIALIZATIONS = [
 ]
 
 const DURATIONS = [30, 45, 60, 90]
-
 const CLIENT_STEPS = ['profile', 'needs']
 const SPEC_STEPS   = ['bio', 'specializations', 'pricing', 'kyc']
 
@@ -47,8 +46,6 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
   const Next = isAr ? IconChevronLeft : IconChevronRight
   const Prev = isAr ? IconChevronRight : IconChevronLeft
 
-  // المرحلة الأولى: اختيار الـ role
-  // المرحلة الثانية: باقي الخطوات حسب الـ role
   const [role, setRole] = useState<'client' | 'specialist' | ''>('')
   const [roleSelected, setRoleSelected] = useState(false)
   const [step, setStep] = useState(0)
@@ -62,7 +59,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
     specializations: [] as string[],
     durations: [60] as number[],
     kycFront: null as File | null,
-    kycBack: null as File | null,
+    kycBack:  null as File | null,
   })
 
   const steps = role === 'specialist' ? SPEC_STEPS : CLIENT_STEPS
@@ -107,29 +104,31 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
 
     try {
       if (role === 'client') {
+        await supabase.from('users').update({ role: 'client' }).eq('id', user.id)
         await supabase.from('clients').upsert({
-          id: user.id,
-          age: parseInt(clientData.age) || null,
-          gender: clientData.gender,
+          id:                user.id,
+          age:               parseInt(clientData.age) || null,
+          gender:            clientData.gender,
           needs_description: clientData.needs,
         })
         window.location.href = `/${safeLang}/dashboard`
       } else {
         let frontUrl = ''
-        let backUrl = ''
+        let backUrl  = ''
         if (specData.kycFront) frontUrl = await uploadToCloudinary(specData.kycFront, 'kyc')
         if (specData.kycBack)  backUrl  = await uploadToCloudinary(specData.kycBack,  'kyc')
 
+        await supabase.from('users').update({ role: 'specialist' }).eq('id', user.id)
         await supabase.from('specialists').upsert({
-          id: user.id,
-          bio: specData.bio,
-          price_per_hour: parseInt(specData.price) || 0,
-          specializations: specData.specializations,
+          id:               user.id,
+          bio:              specData.bio,
+          price_per_hour:   parseInt(specData.price) || 0,
+          specializations:  specData.specializations,
           session_durations: specData.durations,
-          kyc_front_url: frontUrl,
-          kyc_back_url: backUrl,
-          kyc_status: 'pending',
-          is_active: false,
+          kyc_front_url:    frontUrl,
+          kyc_back_url:     backUrl,
+          kyc_status:       'pending',
+          is_active:        false,
         })
         window.location.href = `/${safeLang}/waiting`
       }
@@ -139,7 +138,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
     setLoading(false)
   }
 
-  // ── شاشة اختيار الـ role (منفصلة تماماً عن باقي الخطوات) ──
+  // شاشة اختيار الـ role
   if (!roleSelected) return (
     <main className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-violet-50 flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-lg">
@@ -219,28 +218,18 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
     </main>
   )
 
-  // ── باقي الخطوات ──
   function renderStep() {
     const current = steps[step]
 
     if (current === 'profile') return (
       <div className="space-y-5">
-        <h2 className="text-2xl font-black text-gray-900">
-          {isAr ? 'أخبرنا عنك' : 'Tell us about yourself'}
-        </h2>
-        <p className="text-gray-500 text-sm">
-          {isAr ? 'سنستخدم هذه المعلومات لترشيح أفضل المتخصصين لك' : 'We use this to recommend the best specialists for you'}
-        </p>
+        <h2 className="text-2xl font-black text-gray-900">{isAr ? 'أخبرنا عنك' : 'Tell us about yourself'}</h2>
+        <p className="text-gray-500 text-sm">{isAr ? 'سنستخدم هذه المعلومات لترشيح أفضل المتخصصين لك' : 'We use this to recommend the best specialists for you'}</p>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1.5">{isAr ? 'العمر' : 'Age'}</label>
-          <input
-            type="number"
-            min={10} max={100}
-            value={clientData.age}
+          <input type="number" min={10} max={100} value={clientData.age}
             onChange={e => setClientData({ ...clientData, age: e.target.value })}
-            className={inputClass}
-            placeholder={isAr ? 'عمرك بالسنوات' : 'Your age'}
-          />
+            className={inputClass} placeholder={isAr ? 'عمرك بالسنوات' : 'Your age'} />
         </div>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-2">{isAr ? 'الجنس' : 'Gender'}</label>
@@ -250,16 +239,13 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
               { value: 'female', ar: 'أنثى', en: 'Female' },
               { value: 'other',  ar: 'أخرى', en: 'Other' },
             ].map(g => (
-              <button
-                key={g.value}
-                type="button"
+              <button key={g.value} type="button"
                 onClick={() => setClientData({ ...clientData, gender: g.value })}
                 className={`flex-1 py-3 rounded-xl border-2 text-sm font-medium transition-all ${
                   clientData.gender === g.value
                     ? 'border-blue-500 bg-blue-50 text-blue-600'
                     : 'border-gray-100 text-gray-600 hover:border-blue-200'
-                }`}
-              >
+                }`}>
                 {isAr ? g.ar : g.en}
               </button>
             ))}
@@ -270,66 +256,46 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
 
     if (current === 'needs') return (
       <div className="space-y-5">
-        <h2 className="text-2xl font-black text-gray-900">
-          {isAr ? 'ما الذي تحتاجه؟' : 'What do you need?'}
-        </h2>
-        <p className="text-gray-500 text-sm">
-          {isAr ? 'اكتب بحرية — سيفهم نظامنا احتياجك ويرشح لك الأنسب' : 'Write freely — our system understands you and finds the best match'}
-        </p>
-        <textarea
-          value={clientData.needs}
+        <h2 className="text-2xl font-black text-gray-900">{isAr ? 'ما الذي تحتاجه؟' : 'What do you need?'}</h2>
+        <p className="text-gray-500 text-sm">{isAr ? 'اكتب بحرية — سيفهم نظامنا احتياجك ويرشح لك الأنسب' : 'Write freely — our system understands you and finds the best match'}</p>
+        <textarea value={clientData.needs}
           onChange={e => setClientData({ ...clientData, needs: e.target.value })}
-          rows={5}
-          className={textareaClass}
+          rows={5} className={textareaClass}
           placeholder={isAr
             ? 'مثال: أعاني من ضغط نفسي وقلق بسبب العمل، وأحتاج شخص يساعدني في إدارة مشاعري...'
             : "Example: I've been struggling with work stress and anxiety, I need help managing my emotions..."
-          }
-        />
+          } />
         <div className="text-xs text-gray-400 text-end">{clientData.needs.length} {isAr ? 'حرف' : 'chars'}</div>
       </div>
     )
 
     if (current === 'bio') return (
       <div className="space-y-5">
-        <h2 className="text-2xl font-black text-gray-900">
-          {isAr ? 'عرّف بنفسك' : 'Introduce yourself'}
-        </h2>
-        <p className="text-gray-500 text-sm">
-          {isAr ? 'اكتب نبذة احترافية ستظهر في بروفايلك للعملاء' : 'Write a professional bio that will appear on your profile'}
-        </p>
-        <textarea
-          value={specData.bio}
+        <h2 className="text-2xl font-black text-gray-900">{isAr ? 'عرّف بنفسك' : 'Introduce yourself'}</h2>
+        <p className="text-gray-500 text-sm">{isAr ? 'اكتب نبذة احترافية ستظهر في بروفايلك للعملاء' : 'Write a professional bio that will appear on your profile'}</p>
+        <textarea value={specData.bio}
           onChange={e => setSpecData({ ...specData, bio: e.target.value })}
-          rows={5}
-          className={textareaClass}
+          rows={5} className={textareaClass}
           placeholder={isAr
             ? 'مثال: معالج نفسي معتمد بخبرة 8 سنوات، متخصص في علاج القلق والاكتئاب...'
             : 'Example: Certified psychotherapist with 8 years of experience, specializing in anxiety...'
-          }
-        />
+          } />
         <div className="text-xs text-gray-400 text-end">{specData.bio.length} {isAr ? 'حرف' : 'chars'}</div>
       </div>
     )
 
     if (current === 'specializations') return (
       <div className="space-y-5">
-        <h2 className="text-2xl font-black text-gray-900">
-          {isAr ? 'ما هي تخصصاتك؟' : 'Your Specializations'}
-        </h2>
+        <h2 className="text-2xl font-black text-gray-900">{isAr ? 'ما هي تخصصاتك؟' : 'Your Specializations'}</h2>
         <p className="text-gray-500 text-sm">{isAr ? 'اختر كل التخصصات المناسبة لك' : 'Select all that apply'}</p>
         <div className="grid grid-cols-2 gap-3">
           {SPECIALIZATIONS.map(s => (
-            <button
-              key={s.id}
-              type="button"
-              onClick={() => toggleSpec(s.id)}
+            <button key={s.id} type="button" onClick={() => toggleSpec(s.id)}
               className={`flex items-center gap-3 p-4 rounded-2xl border-2 transition-all text-start w-full ${
                 specData.specializations.includes(s.id)
                   ? 'border-blue-500 bg-blue-50'
                   : 'border-gray-100 hover:border-blue-200 bg-white'
-              }`}
-            >
+              }`}>
               <div className={`w-9 h-9 rounded-lg flex items-center justify-center shrink-0 ${
                 specData.specializations.includes(s.id) ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-500'
               }`}>
@@ -345,23 +311,17 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
 
     if (current === 'pricing') return (
       <div className="space-y-6">
-        <h2 className="text-2xl font-black text-gray-900">
-          {isAr ? 'السعر ومدة الجلسة' : 'Pricing & Duration'}
-        </h2>
+        <h2 className="text-2xl font-black text-gray-900">{isAr ? 'السعر ومدة الجلسة' : 'Pricing & Duration'}</h2>
         <div>
           <label className="text-sm font-medium text-gray-700 block mb-1.5">
             {isAr ? 'سعر الجلسة (بالجنيه المصري)' : 'Session Price (EGP)'}
           </label>
           <div className="relative">
             <IconCurrencyDollar size={18} className="absolute top-1/2 -translate-y-1/2 start-3 text-gray-400" />
-            <input
-              type="number"
-              min={50}
-              value={specData.price}
+            <input type="number" min={50} value={specData.price}
               onChange={e => setSpecData({ ...specData, price: e.target.value })}
               className="w-full ps-10 pe-4 py-3 rounded-xl border border-gray-200 focus:border-blue-400 focus:ring-2 focus:ring-blue-100 outline-none text-sm transition-all text-gray-900 placeholder:text-gray-400 bg-white"
-              placeholder={isAr ? 'مثال: 1000' : 'e.g. 1000'}
-            />
+              placeholder={isAr ? 'مثال: 300' : 'e.g. 300'} />
           </div>
           {specData.price && !isNaN(parseInt(specData.price)) && (
             <div className="mt-3 bg-gray-50 rounded-xl p-3 space-y-1">
@@ -382,16 +342,12 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
           </label>
           <div className="flex gap-3 flex-wrap">
             {DURATIONS.map(d => (
-              <button
-                key={d}
-                type="button"
-                onClick={() => toggleDuration(d)}
+              <button key={d} type="button" onClick={() => toggleDuration(d)}
                 className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border-2 text-sm font-medium transition-all ${
                   specData.durations.includes(d)
                     ? 'border-blue-500 bg-blue-50 text-blue-600'
                     : 'border-gray-100 text-gray-600 hover:border-blue-200'
-                }`}
-              >
+                }`}>
                 <IconClock size={15} />
                 {d} {isAr ? 'دقيقة' : 'min'}
               </button>
@@ -403,9 +359,7 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
 
     if (current === 'kyc') return (
       <div className="space-y-5">
-        <h2 className="text-2xl font-black text-gray-900">
-          {isAr ? 'توثيق الهوية' : 'Identity Verification'}
-        </h2>
+        <h2 className="text-2xl font-black text-gray-900">{isAr ? 'توثيق الهوية' : 'Identity Verification'}</h2>
         <div className="bg-amber-50 border border-amber-100 rounded-2xl p-4 text-sm text-amber-700">
           {isAr
             ? 'مطلوب لحماية العملاء وضمان جودة الخدمة. سيراجع فريقنا طلبك خلال 24 ساعة.'
@@ -432,15 +386,11 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
                   : (isAr ? 'اضغط لرفع الصورة' : 'Click to upload')
                 }
               </span>
-              <input
-                type="file"
-                accept="image/*"
-                className="hidden"
+              <input type="file" accept="image/*" className="hidden"
                 onChange={e => {
                   const file = e.target.files?.[0] ?? null
                   setSpecData(prev => ({ ...prev, [item.key]: file }))
-                }}
-              />
+                }} />
             </label>
           </div>
         ))}
@@ -458,7 +408,6 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
           <span className="text-2xl font-black text-blue-600">MatchInWorld</span>
         </div>
 
-        {/* Progress */}
         <div className="mb-6">
           <div className="flex items-center justify-between text-xs text-gray-400 mb-2">
             <span>{isAr ? `خطوة ${step + 1} من ${totalSteps}` : `Step ${step + 1} of ${totalSteps}`}</span>
@@ -473,7 +422,6 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
           </div>
         </div>
 
-        {/* Card */}
         <div className="bg-white rounded-3xl shadow-xl shadow-gray-100 border border-gray-100 p-8 min-h-96 flex flex-col">
           <div className="flex-1">
             <AnimatePresence mode="wait">
@@ -489,7 +437,6 @@ export default function OnboardingPage({ params }: { params: Promise<{ lang: Loc
             </div>
           )}
 
-          {/* Navigation */}
           <div className="flex items-center justify-between mt-8 pt-6 border-t border-gray-100">
             <button
               type="button"

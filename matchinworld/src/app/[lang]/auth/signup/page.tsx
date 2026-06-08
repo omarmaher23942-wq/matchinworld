@@ -3,7 +3,7 @@
 import { use, useState } from 'react'
 import Link from 'next/link'
 import { motion } from 'framer-motion'
-import { IconUser, IconLock, IconEye, IconEyeOff, IconArrowRight, IconArrowLeft, IconBriefcase } from '@tabler/icons-react'
+import { IconUser, IconLock, IconEye, IconEyeOff, IconArrowRight, IconArrowLeft } from '@tabler/icons-react'
 import { translations, type Locale } from '@/i18n/translations'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
@@ -16,22 +16,13 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
   const Arrow = isAr ? IconArrowLeft : IconArrowRight
   const router = useRouter()
 
-  const [form, setForm] = useState({ name: '', username: '', password: '', role: '' })
+  const [form, setForm] = useState({ name: '', username: '', password: '' })
   const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  const roles = [
-    { value: 'client',     ar: 'أبحث عن متخصص',        en: 'Looking for a Specialist', icon: IconUser },
-    { value: 'specialist', ar: 'أنا متخصص / مقدم خدمة', en: 'I am a Specialist',         icon: IconBriefcase },
-  ]
-
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!form.role) {
-      setError(isAr ? 'اختر نوع حسابك' : 'Please select account type')
-      return
-    }
     if (form.username.trim().length < 3) {
       setError(isAr ? 'اسم المستخدم يجب أن يكون 3 أحرف على الأقل' : 'Username must be at least 3 characters')
       return
@@ -46,7 +37,7 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
     const { data, error: authError } = await supabase.auth.signUp({
       email: fakeEmail,
       password: form.password,
-      options: { data: { name: form.name, username: form.username, role: form.role } }
+      options: { data: { name: form.name, username: form.username } }
     })
 
     if (authError) {
@@ -61,12 +52,12 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
 
     if (data.user) {
       await supabase.from('users').insert({
-        id: data.user.id,
+        id:    data.user.id,
         email: fakeEmail,
-        name: form.name,
-        role: form.role,
+        name:  form.name,
+        role:  'pending',
       })
-      router.push(`/${safeLang}/onboarding`)
+      window.location.href = `/${safeLang}/onboarding`
     }
     setLoading(false)
   }
@@ -85,29 +76,6 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
         </div>
 
         <div className="bg-white rounded-3xl shadow-xl shadow-gray-100 border border-gray-100 p-8">
-
-          {/* Role selector */}
-          <div className="mb-6">
-            <p className="text-sm font-semibold text-gray-700 mb-3">{isAr ? 'أنت...' : 'I am...'}</p>
-            <div className="grid grid-cols-2 gap-3">
-              {roles.map((r) => (
-                <button
-                  key={r.value}
-                  type="button"
-                  onClick={() => setForm({ ...form, role: r.value })}
-                  className={`flex flex-col items-center gap-2 p-4 rounded-2xl border-2 transition-all text-sm font-medium cursor-pointer ${
-                    form.role === r.value
-                      ? 'border-blue-500 bg-blue-50 text-blue-600'
-                      : 'border-gray-100 hover:border-blue-200 text-gray-600'
-                  }`}
-                >
-                  <r.icon size={22} />
-                  {isAr ? r.ar : r.en}
-                </button>
-              ))}
-            </div>
-          </div>
-
           <form onSubmit={handleSubmit} className="space-y-4">
 
             {/* Full Name */}
@@ -172,14 +140,12 @@ export default function SignupPage({ params }: { params: Promise<{ lang: Locale 
               </div>
             </div>
 
-            {/* Error */}
             {error && (
               <div className="bg-red-50 border border-red-100 text-red-600 text-sm px-4 py-3 rounded-xl">
                 {error}
               </div>
             )}
 
-            {/* Submit */}
             <button
               type="submit"
               disabled={loading}

@@ -39,7 +39,7 @@ export default function LoginPage({ params }: { params: Promise<{ lang: Locale }
     }
 
     if (data.user) {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await new Promise(resolve => setTimeout(resolve, 800))
 
       const { data: userData } = await supabase
         .from('users')
@@ -47,16 +47,16 @@ export default function LoginPage({ params }: { params: Promise<{ lang: Locale }
         .eq('id', data.user.id)
         .single()
 
-      console.log('ROLE:', userData?.role)
-      console.log('REDIRECTING TO:', userData?.role === 'admin' ? 'admin' : 'dashboard')
-
-      const dest = userData?.role === 'admin'
-        ? `/${safeLang}/admin`
-        : userData?.role === 'specialist'
-        ? `/${safeLang}/specialist/dashboard`
-        : `/${safeLang}/dashboard`
-
-      window.location.replace(dest)
+      if (userData?.role === 'admin') {
+        window.location.replace(`/${safeLang}/admin`)
+      } else if (userData?.role === 'specialist') {
+        window.location.replace(`/${safeLang}/specialist/dashboard`)
+      } else if (userData?.role === 'client') {
+        window.location.replace(`/${safeLang}/dashboard`)
+      } else {
+        // role = pending — محتاج يكمل الـ onboarding
+        window.location.replace(`/${safeLang}/onboarding`)
+      }
     }
     setLoading(false)
   }
